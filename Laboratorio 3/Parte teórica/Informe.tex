@@ -1,0 +1,190 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{geometry}
+\usepackage{algorithm,algpseudocode}
+
+%Información del documento:
+\newcommand{\departamento}{Magister en Ciencia de Datos}
+\newcommand{\titulo}{Laboratorio 3 (parte teórica)}
+\newcommand{\curso}{MDS7203 Modelos Generativos Profundos}
+\newcommand{\autor}{Fernando Fêtis Riquelme}
+\newcommand{\fecha}{\today}
+
+%Configuración de página:
+\geometry{letterpaper,margin=2.5cm,tmargin=3.5cm}
+\fancyhead[L]{\curso}
+\fancyhead[R]{\titulo}
+\pagestyle{fancy}
+
+\begin{document}
+
+%Portada:
+\begin{titlepage}
+	\centering
+	\includegraphics[width=0.5\textwidth]{uchile}\\
+	\begin{Large}
+		\begin{scshape}
+			Facultad de Ciencias Físicas y Matemáticas\\
+			\departamento\\
+			\vspace{2.5cm}\Huge\titulo\\
+		\end{scshape}
+		\vspace{0.5cm}\curso\\
+		\vspace{4cm}\autor
+	\end{Large}
+	\vfill\fecha
+\end{titlepage}
+
+%Shortcuts usados en el informe:
+\newcommand{\KL}[2]{\text{KL}\left[#1||#2\right]}
+\newcommand{\E}[2]{\mathbb{E}_{#1}\left(#2\right)}
+\newcommand{\nmv}[2]{\text{NMV}\left(#1,#2\right)}
+
+%Documento:
+
+\tableofcontents
+\newpage
+
+% P1.
+\section{Cota inferior de la evidencia}
+
+En esta sección se encontrará una cota inferior para $\log p(x)$ mediante la introducción de otro modelo $q(z|x)$ que buscará aproximar a $p(z|x)$.
+
+\subsection{Divergencia de las posteriores}
+
+Por definición de probabilidad condicional, $p(z|x) = \frac{p(x,z)}{p(x)}$, luego:
+\begin{align}{}
+	\KL{q(z|x)}{p(z|x)} &= \E{q(z|x)}{\log\frac{q(z|x)}{p(z|x)}}\\
+	&= \E{q(z|x)}{\log\frac{q(z|x)}{p(x,z)} + \log p(x)}\\
+	&= \E{q(z|x)}{\log\frac{q(z|x)}{p(x,z)}} + \log p(x) \label{eq:kl_posteriores}
+\end{align}
+
+Donde en la última igualdad se usó que $x$ es constante con respecto a $z\sim q(z|x)$.
+
+Esta igualdad entrega una relación entre el ``error'' de la aproximación de la posterior y la evidencia.
+
+\subsection{Descomposición del ELBO}
+
+Por regla de la cadena, $p(x,z)=p(z)p(x|z)$, luego:
+\begin{align}{}
+	\E{q(z|x)}{\log\frac{q(z|x)}{p(x,z)}} &= \E{q(z|x)}{\log\frac{q(z|x)}{p(z)} - \log p(x|z)}\\
+	&= \KL{q(z|x)}{p(z)} - \E{q(z|x)}{\log p(x|z)} \label{eq:-elbo_training}
+\end{align}
+
+Esta igualdad entrega una expresión equivalente al primer sumando en \eqref{eq:kl_posteriores}.
+
+\subsection{Cota inferior de la evidencia}
+
+Basta despejar la evidencia en \eqref{eq:kl_posteriores}:
+\begin{align}
+	\log p(x) &= \KL{q(z|x)}{p(z|x)} - \E{q(z|x)}{\log\frac{q(z|x)}{p(x,z)}}\\
+		&= \KL{q(z|x)}{p(z|x)} + \E{q(z|x)}{\log\frac{p(x,z)}{q(z|x)}} \label{eq:evidencia}\\
+		&\geq \E{q(z|x)}{\log\frac{p(x,z)}{q(z|x)}} \label{eq:elbo}
+\end{align}
+
+Donde la desigualdad se obtiene considerando que la divergencia de Kullback-Leibler es no negativa (desigualdad de Gibbs). El lado derecho de \eqref{eq:elbo} se conoce como ELBO y tiene varias descomposiciones equivalentes. La descomposición en \eqref{eq:-elbo_training} permite escribir la función objetivo de una forma conveniente para evaluarla durante el entrenamiento.
+
+% P2.
+\section{VAE y reparametrización}
+
+En esta sección se justificará el uso de la ELBO como función objetivo y la forma de calcularla durante el entrenamiento. Para esto último, se usarán modelos $p(x|z)$, $p(z)$ y $q(z|x)$ convenientes.
+
+\subsection{Formulación para la función de pérdida}
+
+El problema asociado al enfoque de máxima verosimilitud, $\max_{p\in\mathcal{M}} \log p(x)$, es intratable ya que la evidencia $\log p(x)$ es intratable para modelos complejos. Por lo tanto, se utilizará el paradigma de inferencia variacional.
+
+De acuerdo a \eqref{eq:evidencia}, $\text{ELBO} = \log p(x) - \KL{q(z|x)}{p(z|x)}$. El enfoque de inferencia variacional propone maximizar la ELBO ya que esto maximiza la evidencia $\log p(x)$ al mismo tiempo que se minimiza el error de aproximación de la posterior $p(z|x)$. Por lo tanto, se sustituye el problema de MLE por el siguiente problema proxy, el cual, como se verá, es tratable bajo ciertas hipótesis:
+
+\begin{equation}
+\max\limits_{p,q} \text{ELBO}:= \E{q(z|x)}{\log\frac{p(x,z)}{q(z|x)}}
+\end{equation}
+
+ Para computar la función objetivo durante el entrenamiento, se utilizará la descomposición dada en \eqref{eq:-elbo_training}:
+\begin{align}
+	\text{ELBO} &= \E{q(z|x)}{\log p(x|z)} - \KL{q(z|x)}{p(z)}  \label{eq:elbo_objective}
+\end{align}
+
+Para que esta función objetivo sea fácil de computar, se elegirán familias específicas para los modelos $p(x|z)$, $p(z)$ y $q(z|x)$. Los modelos que se proponen en el paper de VAE son los siguientes:
+
+\begin{itemize}
+	\item \textbf{Encoder:} se considerará que $q(z|x)=\nmv{\mu(x)}{\text{diag}(\sigma^2(x))}$, donde $\mu$ y $\sigma^2$ son funciones aprendidas por una otra red neuronal con parámetros $\phi$.
+	\item \textbf{Prior:} se asumirá que $p(z)=\nmv{0}{I}$. Esto permitirá hacer la divergencia tratable en \eqref{eq:elbo_objective}.
+	\item \textbf{Decoder:} para aprender $p(x|z)$ se utilizará una red neuronal con parámetros $\theta$.
+\end{itemize}
+
+El término de reconstrucción $\E{q(z|x)}{\log p(x|z)}$ es intratable ya que requiere integrar sobre todo el soporte de $q(z|x)$. Por lo tanto, será estimado mediante una aproximación de Monte Carlo. Sean $(\hat{z}_i)_{i=1}^n$ muestras i.i.d. ($n=1$ en el paper de VAE) generadas a partir de $q(z|x)=\nmv{\mu(x)}{\text{diag}(\sigma^2(x))}$, entonces:
+
+\begin{equation}
+	\E{q(z|x)}{\log p(x|z)} \approx \frac{1}{n} \sum_{i=1}^n \log p(x|\hat{z}_i) \label{eq:monte_carlo}
+\end{equation}
+
+Por otra parte, la divergencia entre dos gaussianas tiene forma cerrada. Considerando que $\mu,\sigma^2\in\mathbb{R}^D$:
+
+\begin{equation}
+	\KL{\nmv{\mu}{\text{diag}(\sigma^2)}}{\nmv{0}{I}} = -\frac{1}{2} \sum_{d=1}^D (1+\log\sigma^2_d - \mu^2_d - \sigma^2_d)
+\end{equation}
+
+Usando esta igualdad en el término de regularización $\KL{q(z|x)}{p(z)}$ en \eqref{eq:elbo_objective} y considerando la aproximación hecha en \eqref{eq:monte_carlo}, la función objetivo que se utilizará durante el entrenamiento corresponde a:
+
+\begin{equation}
+	\mathcal{L}_{\theta,\phi}(x):= \frac{1}{n} \sum_{i=1}^n \log p(x|\hat{z}_i) + \frac{1}{2} \sum_{d=1}^D (1+\log\sigma^2_d(x) - \mu^2_d(x) - \sigma^2_d(x))
+\end{equation}
+
+Donde las muestras $(\hat{z}_i)_{i=1}^n$ serán definidas mediante $\hat{z}_i = \mu(x) + \sigma(x)\odot\epsilon_i$, con $(\epsilon_i)_{i=1}^n$ muestras i.i.d. generadas a partir de $\nmv{0}{I}$. Aquí $\odot$ representa el producto de Hadamard (element-wise).
+
+Esta función de pérdida está asociada a una muestra particular $x\sim p_{\text{real}}(x)$, por lo que, naturalmente, la función de pérdida global será $\max_{\theta,\phi} \E{p_\text{real}(x)}{\mathcal{L}_{\theta,\phi}(x)}$, donde la esperanza sobre $p_\text{real}(x)$ será aproximada usando la distribución empírica (promedio de la función objetivo sobre los datos de entrenamiento).
+
+\subsubsection{Término de reconstrucción para imágenes}
+
+En esta subsección se justificará el hecho de usar entropía cruzada binaria para el cálculo del término de reconstrucción $\E{q(z|x)}{\log p(x|z)}$ en la parte práctica del laboratorio. Cuando se trabaja con imágenes hay dos formas naturales para modelar la distribución condicional $p(x_{ij}|z)$ de un pixel $x_{ij}$:
+
+\begin{itemize}
+	\item Como una distribución categórica sobre las posibles intensidades del pixel.
+	\item Como una distribución Bernoulli (asumiendo que la imagen está escalada al intervalo $[0,1]$). En este caso, el pixel está activo o inactivo, y su probabilidad de activación $p(x_{ij}|z)$ se asocia a la intensidad del pixel.
+\end{itemize}
+
+El primer enfoque necesita demasiados parámetros en la última capa debido a que se necesita una neurona por cada posible valor de intensidad. Además, al usar una distribución categórica se pierde el orden total que hay entre las distintas intensidades.
+
+Por los motivos anteriores, se suele usar el segundo enfoque. En este caso, para un $z$ fijo, la red neuronal del decoder entrega un parámetro $\rho_{ij}$ por cada pixel $x_{ij}$, indicando que $x_{ij}\sim\text{Ber}(\rho_{ij})$. Por lo tanto, el decoder entrega una matriz con la probabilidad $p(x_{ij}|z)$ en cada una de sus entradas.
+
+\subsection{Variables del encoder y del decoder}
+
+El encoder real está asociado a la posterior $p(z|x)$ pero, dado que es intratable, la distribución es aproximada mediante inferencia variacional por $q(z|x)$. De esta forma, el encoder es aprendido por una red neuronal que recibe una muestra $x$ y entrega la distribución posterior $q(z|x)$.
+
+Por otra parte, el decoder está asociado a la verosimilitud condicional $p(x|z)$. Por lo tanto, es aprendido por otra red neuronal que recibe una variable latente $z$ y entrega la distribución condicional $p(x|z)$.
+
+\subsection{Generación de nuevas muestras}
+
+Considerando que un VAE está asociado al modelo gráfico $p(x,z)=p(z)p(x|z)$ y que el prior $p(z)$ es gaussiano (por lo que es fácil generar muestras de él), el proceso para generar una muestra $(x,y)$ consiste en generar una muestra a partir de la distribución latente y luego decodificarla para obtener la distribución $p(x|z)$. Luego, se puede utilizar esta misma distribución como muestra generada:
+
+\begin{algorithm}
+	\caption{Generar una muestra en un VAE}
+	\label{alg:sampling}
+	\begin{algorithmic}[1]
+	\Procedure{GenerarMuestra}{VAE}
+		\State Generar muestra $z \sim p(z)$  \Comment{variable latente fácil de generar}
+		\State $p(x|z) \gets \texttt{VAE.decoder}(z)$  \Comment{distribución condicional para $x$}
+		\State $x \gets \mathbb{E}(p(x|z))$  \Comment{generación de la muestra}
+		\State \textbf{return} $x$
+	\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+Es importante indicar que se está entregando como imagen generada al parámetro de la distribución Bernoulli asociada a cada pixel. Esto equivale a entregar la esperanza de cada pixel ya que $\mathbb{E}(\text{Ber}(\rho))=\rho$. Usando este método se pueden obtener imágenes donde cada pixel tiene una intensidad en $[0,1]$, pero se pierde la posibilidad de generar nuevas muestras a partir de una misma variable latente $z$, lo cual es deseable en muchos casos.
+
+Por otra parte, la expresividad se logra debido a la capacidad del decoder $p(x|z)$. Dado que la variable latente $z$ sigue una distribución gaussiana, entonce tiene soporte completo (todo $\mathbb{R}$). Luego, la expresividad se obtiene gracias a los teoremas de densidad de las redes neuronales, los cuales afirman que, bajo ciertas condiciones, una red neuronal puede aproximar cualquier función continua en un compacto (siempre que se le dé suficiente capacidad). Por lo tanto, dado que la red neuronal asociada al decoder $p(x|z)$ recibe a $z$ como entrada, entonces es posible generar muestras tan complejas como se quiera.
+
+\subsection{Truco de la reparametrización}
+
+En \eqref{eq:monte_carlo} se aproxima el término de reconstrucción utilizando muestras i.i.d. generadas a partir de la posterior aproximada $q(z|x)=\nmv{\mu(x)}{\text{diag}(\sigma^2(x))}$.
+
+Si las muestras $(\hat{z}_i)_{i=1}^n$ son generadas directamente a partir de dicha gaussiana (sin usar el truco de la reparametrización), entonces el encoder $q(z|x)$ está interactuando con la función de pérdida mediante generación de muestras, lo cual no es una operación diferenciable, por lo que no es posible entrenar la red neuronal del encoder usando algoritmos de gradiente.
+
+Para evitar este problema, se observa que las muestras de la posterior $q(z|x)$ se pueden escribir como $z = \mu(x) + \sigma(x)\odot\epsilon$, donde $\epsilon\sim\text{NMV}\left(0,I\right)$. De esta forma, los parámetros del encoder interactúan de una forma determinista con la función de pérdida y se recupera la diferenciabilidad.
+
+Por último, es bueno comentar que el truco de la reparametrización también permite estabilizar la varianza del estimador de Monte Carlo ya que la distribución desde la que se generarán muestras en \eqref{eq:monte_carlo} queda fija y ya no depende de $x$.
+
+\end{document}
