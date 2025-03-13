@@ -1,0 +1,86 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 2: Repaso de probabilidad y redes neuronales}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Probabilidades}
+
+\begin{frame}{Variables aleatorias discretas}
+    Se debe definir la función de masa $p(x)$ para cada posible valor de la variable aleatoria $x$.
+    \begin{itemize}
+        \item<2> Distribución de Bernoulli.
+        \item<3> Distribución categórica.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Variables aleatorias continuas}
+    Se debe definir la función de densidad $p(x)$ para cada posible valor de la variable aleatoria $x$.
+    \begin{itemize}
+        \item<2> Distribución gaussiana.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Probabilidad condicional y dependencia}
+    En modelos complejos, las variables aleatorias involucradas pueden estar relacionadas entre ellas, generando dependencia. También es posible querer apartar (marginalizar) variables para estudiarlas de forma independiente.
+    \begin{itemize}
+        \item<2> Dependencia e independencia.
+        \item<3> Distribución marginal.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Momentos}
+    Corresponden a medidas estadísticas de una distribución de probabilidad que suelen ser interpretables.
+    \begin{itemize}
+        \item<2> Esperanza.
+        \item<3> Varianza.
+    \end{itemize}
+\end{frame}
+
+\section{Redes neuronales}
+
+\begin{frame}{Formulación}
+    Las redes neuronales son la base de cualquier modelo moderno de IA generativa. Se basan en la idea de que una red neuronal puede aprender a representar (casi) cualquier función.
+    \begin{itemize}
+        \item<2> Formulación.
+        \item<3> Entrenamiento.
+        \item<4> Tipos de redes neuronales.
+        \item<5> Clasificación con redes neuronales.
+        \item<6> Implementación de una red neuronal en PyTorch.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item<2> Se revisarán los conceptos de red bayesiana, modelos de variable latente y modelos condicionales.
+        \item <3> Se introducirá el problema de inferencia y el concepto de verosimilitud en una red bayesiana.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 2: Repaso de probabilidad y redes neuronales}
+\end{frame}
+
+\end{document}
