@@ -1,0 +1,69 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 7: Arquitectura Transformer y LLMs (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Variaciones en la arquitectura Transformer}
+
+\begin{frame}{Variaciones en la arquitectura Transformer}
+    \begin{itemize}
+        \item<1> \textbf{Tokenización:} tokens espaciales, problema de tokenización, BPE, SentencePiece.
+        \item<2> \textbf{Positional encoding:} absoluto, relativo, sinusoidal, RoPE, inducido por masking.
+        \item<3> \textbf{Mecanismos de normalización:} LayerNorm, RMSNorm.
+        \item<4> \textbf{Mecanismos de atención:} atención cruzada, atención de Badhanau, scaled dot-product, Sliding window attention, atención diferencial.
+        \item<5> \textbf{Bloque feed forward:} función de activación, MoE.
+        \item<6> Conexiones residuales y dropout.
+        \item<7> \textbf{Arquitectura original:} seq2seq.
+    \end{itemize}
+\end{frame}
+
+\section{Entrenamiento y generación}
+
+\begin{frame}{Entrenamiento y generación}
+    \begin{itemize}
+        \item<1> Función de pérdida.
+        \item<2> \textbf{Técnicas de optimización:} Implementaciones eficientes, entrenamiento distribuido, cuantización, heurísticas.
+        \item<3> \textbf{Fine tuning:} LoRA, pruning, destilación, instruction fine tuning.
+        \item<4> Train set y evaluación.
+        \item<5> \textbf{Inferencia:} beam search, nucleus sampling.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item<1> Propiedades emergentes.
+        \item<2> Scaling laws.
+        \item<3> Prompting.
+        \item<4> Consideraciones éticas.
+        \item<5> Algunos modelos tipo Transformer.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 7: Algunas cosas sobre la arquitectura Transformer y los LLMs I}
+\end{frame}
+
+\end{document}
