@@ -1,0 +1,55 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 17: Modelos de difusión (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Revisión tarea VAE}
+\section{Modelos de difusión a tiempo discreto}
+
+\begin{frame}{Formulación de un modelo de difusión}
+    \begin{itemize}
+        \item<1> Procesos forward y backward.
+        \item<2> $q(x_t|x_0)$ es gaussiana.
+        \item<3> $q(x_{t-1}|x_t,x_0)$ es gaussiana.
+        \item<4> ELBO de un modelo de difusión.
+        \item<5> Forma cerrada para la ELBO.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item<1> Reparametrizaciones $x_0$-prediction y $\epsilon$-prediction.
+        \item<2> DMs como modelos basados en score.
+        \item<3> Generación condicional y guidance.
+        \item<4> DDIM.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 17: Modelos de difusión (parte I)}
+\end{frame}
+
+\end{document}
