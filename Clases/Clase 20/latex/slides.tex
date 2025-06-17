@@ -1,0 +1,89 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 19: Modelos generativos a tiempo continuo (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Modelos de difusión a tiempo continuo}
+
+\begin{frame}{Ecuaciones diferenciales estocásticas}
+    \begin{itemize}
+        \item<1> Movimiento browniano.
+        \item<2> SDEs y algoritmo de Euler-Maruyama.
+        \item<3> Ecuación de Fokker-Planck.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Modelos de difusión usando SDEs}
+    \begin{itemize}
+        \item<1> Teorema de Anderson.
+        \item<2> Formulación.
+    \end{itemize}
+\end{frame}
+
+\section{Proyecto final}
+
+\begin{frame}{Reglas generales}
+    \begin{itemize}
+        \item<1> Se debe estudiar en profundidad un modelo o paper.
+        \item<2> El objetivo es entender en detalle el paper y realizar una implementación minimal y funcional del modelo estudiado.
+        \item<3> El proyecto se realiza en grupos de 4 personas y el trabajo se asigna por orden de inscripción (no se pueden repetir papers).
+        \item<4> Las presentaciones se realizarán en el periodo de exámenes.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Reglas generales}
+    Algunas consideraciones adicionales:
+    \begin{itemize}
+        \item<1> Si el modelo es público, se pueden adaptar los pesos a la implementación realizada. Si no, se debe entrenar el modelo en un dataset simple.
+        \item<2> Si el modelo utiliza otros modelos externos, estos se pueden importar sin tener que implementarlos.
+        \item<3> Se pueden omitir demostraciones y desarrollos muy técnicos en papers extensos.
+        \item<4> No se pueden reutilizar implementaciones realizadas en otros cursos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ideas para el proyecto final}
+    La siguiente es una lista no exhaustiva de papers que se pueden considerar para el proyecto final:
+    \begin{itemize}
+        \item<1> \textbf{ARMs:} BERT, ViT, CLIP, DALL·E (1), LLaMA, Toolformer, RLHF, DPO, Chameleon, Mixtral, PixelRNN.
+        \item<2> \textbf{GANs:} WGAN, BigGAN, InfoGAN, ProGAN, StyleGAN, VQ-GAN.
+        \item<3> \textbf{VAEs:} VQ-VAE, InfoVAE, HVAE, AVAE, WAE.
+        \item<4> \textbf{EBMs:} Máquinas de Boltzmann, redes de Hopfield, contrastive divergence, sliced SM, NCE.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ideas para el proyecto final}
+    La siguiente es una lista no exhaustiva de papers que se pueden considerar para el proyecto final:
+    \begin{itemize}
+        \item<1> \textbf{DMs:} DiT, GLIDE, Stable Diffusion, DALL·E (2), IMAGEN, DreamBooth, ControlNet.
+        \item<2> \textbf{NFs:} Consistency models, Stable diffusion (3), FLUX, FM discreto, NODE, Glow, InstaFlow, Real NVP.
+        \item<3> \textbf{Otros:} World models, SSM, OT/EOT, puentes de Schrödinger, stochastic interpolants.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 19: Modelos generativos a tiempo continuo (parte II)}
+\end{frame}
+
+\end{document}
