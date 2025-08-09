@@ -1,0 +1,252 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 2: Repaso de probabilidad y redes neuronales}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Probabilidades}
+
+\begin{frame}{Variables aleatorias discretas}
+
+    \begin{itemize}
+        \item Una \textbf{variable aleatoria} es una función $x:\Omega\to\R^D$ donde $\Omega$ es el espacio muestral. \item Esta función tiene asociada una \textbf{distribución de probabilidad} que le asigna masa a los eventos de $\Omega$.
+        \item Una variable aleatoria se dice \textbf{discreta} si solo puede tomar una cantidad finita de valores:
+        \begin{equation*}
+            \text{supp}(x)=\{k_1,\ldots,k_N\}
+        \end{equation*}
+        \item Una variable aleatoria discreta tiene asociada una \textbf{función de masa} $p:\{k_1,\ldots,k_N\}\to[0,1]$:
+              \begin{equation*}
+                  p(k_n)=\text{Prob}(x=k_n),\quad n=1,\ldots,N
+              \end{equation*}
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Variables aleatorias discretas}
+
+    Ejemplos de variables aleatorias discretas:
+
+    \begin{itemize}
+        \item \textbf{Distribución de Bernoulli:} $x\sim \text{Bernoulli}(r)$ con $r\in[0,1]$ si
+              \begin{align*}
+                  p(x) & =\begin{cases}
+                              r   & \text{si } x=1 \\
+                              1-r & \text{si } x=0
+                          \end{cases}               \\
+                       & = r^x(1-r)^{1-x}, \quad x\in\{0,1\}
+              \end{align*}
+
+        \item \textbf{Distribución categórica:} $x\sim\text{Categórica}(r)$ con $r\in[0,1]^N$ si
+              \begin{equation*}
+                  p(k_n)=r_n,\quad n=1,\ldots,N
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Variables aleatorias continuas}
+
+    \begin{itemize}
+        \item Una variable aleatoria se dice \textbf{continua} si tiene soporte $\text{supp}(x)\subset\R^D$ continuo.
+        \item Una variable aleatoria continua tiene asociada una \textbf{función de densidad} $p:\R^D\to\R_+$:
+              \begin{equation*}
+                  \text{Prob}(x\in A)=\int_A p(x)\,\text{d}x, \quad A\subset\R^D
+              \end{equation*}
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Variables aleatorias continuas}
+
+    Ejemplos de variables aleatorias continuas:
+    \begin{itemize}
+        \item \textbf{Distribución gaussiana:} $x\sim\mathcal{N}(\mu,\sigma^2)$ con $\mu\in\R$ y $\sigma^2>0$ si
+              \begin{equation*}
+                  p(x)=\frac{1}{\sqrt{2\pi\sigma^2}}\exp\left(-\frac{1}{2\sigma^2}(x-\mu)^2\right)
+              \end{equation*}
+
+        \item \textbf{Distribución gaussiana en $\R^D$:} $x=(x_1,\ldots,x_D)\sim \mathcal{N}(\mu,\Sigma)$ con $\mu\in\R^D$ y $\Sigma\in\mathcal{M}_{D,D}(\R)$ simétrica y definida positiva si
+              \begin{equation*}
+                  p(x)=\frac{1}{\sqrt{(2\pi)^D\text{det}(\Sigma)}}
+                  \exp\left(
+                  -\frac{1}{2}(x-\mu)^\top \Sigma^{-1}(x-\mu)
+                  \right)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Conceptos básicos}
+
+    Para $(x,y)\sim p(x,y)$ se tienen los siguientes conceptos:
+
+    \begin{itemize}
+        \item \textbf{Probabilidad condicional:}
+              \begin{equation*}
+                  p(y|x):=\frac{p(x,y)}{p(x)}
+              \end{equation*}
+        \item \textbf{Independencia:} $x\perp y$ si
+              \begin{equation*}
+                  p(x|y)=p(x)
+                  \quad\text{o, equivalentemente,}\quad
+                  p(x,y)=p(x)p(y)
+              \end{equation*}
+        \item \textbf{Marginalización:}
+              \begin{equation*}
+                  p(x)=\int_{\R^D} p(x,y)\,\text{d}y
+              \end{equation*}
+
+    \end{itemize}
+\end{frame}
+
+
+
+
+\begin{frame}{Esperanza}
+
+    Para $x\sim p(x)$ se define la \textbf{esperanza} como
+
+    \begin{equation*}
+        \mathbb{E}_{x\sim p(x)}\left[x\right]:=\int_{\R^D} x\, p(x)\,\text{d}x
+    \end{equation*}
+
+
+    \begin{itemize}
+        \item Es lineal: $\mathbb{E}\left[\alpha x+\beta y\right] = \alpha\,\mathbb{E}\left[x\right] + \beta\,\mathbb{E}\left[y\right]$.
+        \item Si $x$ e $y$ son independientes, $\mathbb{E}\left[xy\right]=\mathbb{E}\left[x\right]\mathbb{E}\left[y\right]$.
+        \item Se puede factorizar:
+              \begin{equation*}
+                  \mathbb{E}_{p(x,y)}[f(x,y)] = \mathbb{E}_{p(y)}\left[\mathbb{E}_{p(x|y)}[f(x,y)]\right]
+              \end{equation*}
+
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Varianza}
+
+    Para $x\sim p(x)$ se define la \textbf{varianza} como
+
+    \begin{equation*}
+        \text{Var}(x):=\mathbb{E}_{p(x)}\left[(x-\mu)^2\right],
+        \quad\text{donde}\quad
+        \mu=\mathbb{E}_{p(x)}\left[x\right]
+    \end{equation*}
+
+
+    \begin{itemize}
+        \item $\text{Var}(x)\geq0$ y $\text{Var}(x)=0$ si y solo si $x$ es constante.
+        \item Si $x\perp y$, entonces para $\alpha,\beta\in\R$:
+              \begin{equation*}
+                  \text{Var}(\alpha x+\beta y)=\alpha^2\text{Var}(x)+\beta^2\text{Var}(y)
+              \end{equation*}
+
+    \end{itemize}
+\end{frame}
+
+\section{Redes neuronales}
+
+\begin{frame}{Definición general}
+    \begin{itemize}
+        \item Todos los tipos de dato que se trabajarán pueden representarse como vectores en $\R^D$.
+        \item Una \textbf{red neuronal} es una función $f:\R^D\to\R^K$ que se puede \textit{adaptar} usando un \textbf{conjunto de entrenamiento}
+              \begin{equation*}
+                  \mathcal{D}=\left\{(x^1,y^1),\ldots,(x^R,y^R)\right\}\subset\R^D\times\R^K
+              \end{equation*}
+        \item Por lo general, una red neuronal es una composición de funciones de la forma
+              \begin{equation*}
+                  f(x)=f_N(f_{N-1}(...(f_1(x))...)),
+              \end{equation*}
+              donde $f_n:\R^{D_{n-1}}\to\R^{D_n}$ (con $D_0=D$ y $D_N=K$) son los \textbf{bloques} que componen la red.
+    \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}{Redes fully-connected}
+    Una \textbf{red fully connected} es un tipo de red neuronal donde cada bloque $f_n:\R^{D_{n-1}}\to\R^{D_n}$ es de la forma
+    \begin{equation*}
+        f_n(x)=\Phi(A_nx+b_n).
+    \end{equation*}
+    \begin{itemize}
+        \item $A_n\in\mathcal{M}_{D_n,D_{n-1}}(\R)$ y $b_n\in\R^{D_n}$ son los \textbf{parámetros} del bloque $f_n$ que definen su comportamiento.
+        \item $\Phi:\R^{D_n}\to\R^{D_n}$ es una \textbf{función de activación} que aplica una misma función $\phi:\R\to\R$ coordenada a coordenada:
+              \begin{equation*}
+                  \Phi(y)=\left(\phi(y_1),\ldots,\phi(y_{D^n})\right)
+              \end{equation*}
+        \item Una red neuronal puede recibir más entradas agregando más parámetros. Por ejemplo:
+              \begin{equation*}
+                  f_n(x,c)=\Phi(A_nx+B_nc+d_n),
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    El conjunto de parámetros $\Theta:=\{\theta_1,\ldots,\theta_N\}$ se suele elegir minimizando una \textbf{función de pérdida} $L:\R^K\times\R^K\to\R$ promediada sobre el conjunto de entrenamiento:
+    \begin{equation*}
+        \min_{\Theta}\mathcal{L}\left(\mathcal{D}\right),
+        \quad\text{donde}\quad
+        \mathcal{L}\left(\mathcal{D}\right)=\frac{1}{R}\sum_{r=1}^R L(f(x_r),y_r)
+    \end{equation*}
+    Para esto, se utilizan algoritmos de optimización basados en gradiente, los cuales realizan iteraciones de la forma
+    \begin{equation*}
+        \theta_n\leftarrow\theta_n - \lambda\,\nabla_{\theta_n} \mathcal{L}\left(\mathcal{D}\right),
+        \quad n=1,\ldots,N
+    \end{equation*}
+    donde $\lambda>0$ se denomina \textbf{tasa de aprendizaje}.
+\end{frame}
+
+
+\begin{frame}{Ejemplo: clasificación con redes neuronales}
+
+    Para la tarea de clasificación ($x$: imagen, $y$: clase):
+
+    \begin{itemize}
+        \item Se puede considerar que $p_\text{data}(y|x)\sim\text{Categórica}(r_\text{data})$, donde $r_\text{data}\in[0,1]^K$ es un vector de probabilidades.
+        \item $p_\text{data}(y|x)$ se aproxima con $p_\theta(y|x)\sim\text{Categórica}(r_\theta(x))$, donde $r_\theta$ es una red neuronal entrenada maximizando
+              \begin{equation*}
+                  \mathcal{L}\left(\mathcal{D}\right)=\frac{1}{R}\sum_{r=1}^R \log p_\theta(y^r|x^r)
+              \end{equation*}
+        \item Para que $r_\theta$ sea un vector de probabilidades, se suele utilizar la función $\text{softmax}:\R^K\to[0,1]^K$ en la salida:
+              \begin{equation*}
+                  \text{softmax}(l):=\left(\frac{e^{l_1}}{\sum_{k=1}^K e^{l_k}}, \ldots,\frac{e^{l_K}}{\sum_{k=1}^K e^{l_k}}\right),
+                  \quad\text{para}\quad l\in\R^K
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Introducción a las redes bayesianas.
+        \item Modelos de variable latente, modelos generativos condicionales, ejemplos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 2: Repaso de probabilidad y redes neuronales}
+\end{frame}
+
+\end{document}
