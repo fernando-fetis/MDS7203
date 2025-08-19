@@ -1,0 +1,190 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 5: Modelos autorregresivos y LLMs (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Formulación de un LM}
+
+\begin{frame}{Vocabulario}
+    Si $\mathcal{V}_0=\{a_1,\ldots,a_K\}$ es un vocabulario común, los elementos de una secuencia $S=(w_1,\ldots,w_T)$ se denominan \textbf{tokens}.
+    Es habitual considerar un \textbf{vocabulario extendido} $\mathcal{V}\supset\mathcal{V}_0$, el cual incluye algunos tokens especiales utilizados durante el entrenamiento e inferencia del modelo. Por ejemplo:
+    \begin{itemize}
+        \item \textbf{Begin of sentence:} $\text{<BOS>}$.
+        \item \textbf{End of sentence:} $\text{<EOS>}$.
+        \item \textbf{Unknown:} $\text{<UNK>}$.
+        \item \textbf{Padding:} $\text{<PAD>}$.
+    \end{itemize}
+    En este caso:
+    \begin{equation*}
+        \mathcal{V}=\{a_1,\ldots,a_K,\underbrace{\text{<BOS>}}_{a_{K+1}},\underbrace{\text{<EOS>}}_{a_{K+2}},\underbrace{\text{<UNK>}}_{a_{K+3}},\underbrace{\text{<PAD>}}_{a_{K+4}}\}.
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Corpus y conjunto de entrenamiento}
+    \begin{itemize}
+        \item $\mathcal{V}^*=\cup_{n\in\N} \mathcal{V}^n$ denota el conjunto de todas las secuencias de tokens formadas por símbolos del vocabulario $\mathcal{V}$.
+        \item Para entrenar un \textbf{modelo de lenguaje}, es necesario contar con un conjunto de entrenamiento $\mathcal{D}=\{S_1,\ldots,S_N\}\subset \mathcal{V}^*$.
+        \item Es usual recortar o extender (usando el token especial $\text{<PAD>}$) todas las secuencias de entrenamiento a un mismo largo $T\in\N$. Esto permite poder entrenar con batches de secuencias.
+        \item Dado un \textbf{corpus} sobre un vocabulario $\mathcal{V}$, una forma natural de construir $\mathcal{D}\subset\mathcal{V}^*$ es considerar todas las subsecuencias de tamaño $T$ que se puedan obtener a partir de dicho corpus.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Formulación autorregresiva}
+    Dada una secuencia de tokens, $S=(w_1,\ldots,w_T)\in\mathcal{V}^*$, un \textbf{modelo autorregresivo} descompone la probabilidad conjunta $p_\theta(S)$ de manera causal:
+    \begin{equation*}
+        p_\theta(w_1,\ldots,w_T)=p_\theta(w_1)\prod_{t=1}^{T-1} p_\theta(w_{t+1}|w_1,\ldots,w_t)
+    \end{equation*}
+    \begin{itemize}
+        \item $w_1$ siempre es $\text{<BOS>}$, por lo que se puede fijar $p_\theta(w_1)=\delta_{\text{<BOS>}}(w_1)$.
+        \item Por lo tanto, solo se requiere aprender $p_\theta(w_{t+1}|w_1,\ldots,w_t)$ para todo contexto $(w_1,\ldots w_t)\in\mathcal{V}^*$ y posible continuación $w_{t+1}\in\mathcal{V}$.
+        \item Con esta distribución aprendida, es posible generar nuevas secuencias de tokens.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Formulación autorregresiva}
+    \begin{itemize}
+        \item $p_\theta(w_{t+1}|w_1,\ldots,w_t)\sim\operatorname{Cat}\left(\mathcal{V};\lambda_\theta(w_1,\ldots,w_t)\right)$ es una distribución categórica sobre el vocabulario $\mathcal{V}$, cuyo vector de probabilidades es $\lambda_\theta(w_1,\ldots,w_t)\in[0,1]^{|\mathcal{V}|}$, es decir:
+              \begin{equation*}
+                  p_\theta(w_{t+1}=a_k|w_1,\ldots,w_t)=\lambda_\theta(w_1,\ldots,w_t)_k\in[0,1],
+              \end{equation*}
+        \item El vector de probabilidades $\lambda_\theta(w_1,\ldots,w_t)\in[0,1]^{|\mathcal{V}|}$, es  aprendido por una red neuronal $\lambda_\theta:\mathcal{V}^*\to[0,1]^{|\mathcal{V}|}$.
+        \item Esta red neuronal recibe una secuencia de tokens $(w_1,\ldots,w_t)\in\mathcal{V}^*$ como contexto y entrega una distribución sobre $\mathcal{V}$ asociada al próximo token en el tiempo $t+1$
+    \end{itemize}
+\end{frame}
+
+\section{Inferencia usando una RNN}
+
+\begin{frame}{Vectores de embedding}
+    \begin{itemize}
+        \item Las redes neuronales esperan como entrada vectores de $\R^D$, por lo que es necesario obtener una \textbf{representación continua} para cada uno de los símbolos del vocabulario $\mathcal{V}$.
+        \item Se puede asociar cada token $a\in\mathcal{V}$ con un \textbf{vector de embedding} $\operatorname{emb}(a)\in\R^D$.
+        \item El operador $\operatorname{emb}:\mathcal{V}\to\R^D$ mapea el $k$-ésimo token del vocabulario $\mathcal{V}$ a la $k$-ésima fila de una matriz $E\in\mathcal{M}_{|\mathcal{V}|,D}(\R)$, denominada \textbf{matriz de embedding}, la cual es aprendida junto al resto de los parámetros de la red neuronal.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Redes Neuronales Recurrentes (RNN)}
+    \begin{itemize}
+        \item Dado que la entrada $(w_1,\ldots,w_t)\in\mathcal{V}^*$ a la red neuronal es de largo variable, no es posible utilizar una red MLP estándar para parametrizar la distribución $p_\theta(w_{t+1}|w_1,\ldots,w_t)$.
+        \item Una alternativa clásica para este tipo de problemas es usar una \textbf{red neuronal recurrente}. La red de Elman clásica procesa una secuencia de tokens $(w_1,\ldots,w_t)$ de forma recursiva
+              \begin{equation*}
+                  \begin{cases}
+                      h_0 = 0                                            \\
+                      h_s =\tanh(A\operatorname{emb}(w_s)+Bh_{s-1}+d), &
+                      1\leq s\leq t
+                  \end{cases}
+              \end{equation*}
+        \item  De este modo, se puede considerar que
+              \begin{equation*}
+                  \lambda_\theta(w_1,\ldots,w_t)=\operatorname{softmax}(Ch_t+e)\in[0,1]^{|\mathcal{V}|}
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    \begin{itemize}
+        \item  Si $\mathcal{D}=\{S_1,\ldots,S_N\}\subset\mathcal{V}^*$ es un conjunto de secuencias de entrenamiento, se puede entrenar maximizando la verosimilitud:
+              \begin{equation*}
+                  \max_\theta \frac{1}{|\mathcal{D}|}\sum_{S\in\mathcal{D}} \frac{1}{|S|}\log p_\theta(S).
+              \end{equation*}
+        \item Las normalizaciones entregan independencia en el tamaño de batch y en los largos de las secuencias.
+        \item Para una secuencia $S=(w_1,\ldots,w_T)\in\mathcal{V}^*$:
+              \begin{align*}
+\log p_\theta(S)
+=&\log\left(p_\theta(w_1)\prod_{t=1}^{T-1} p_\theta(w_{t+1}|w_1,\ldots,w_t)\right)\\
+=& \sum_{t=1}^{T-1} \log p_\theta(w_{t+1}|w_1,\ldots,w_t).
+\end{align*}
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Generación}
+    Se puede generar una nueva secuencia de tokens utilizando un modelo autorregresivo entrenado:
+\begin{itemize}
+    \item Se comienza con el token inicial $w_1=\text{<BOS>}$ y se evalúa el modelo neuronal para predecir el siguiente token.
+    \item Esto se repite de manera iterativa usando como contexto la secuencia de tokens que ya han sido generados.
+    \item La generación continúa hasta que se genera el token $\text{<EOS>}$ (o $\text{<PAD>}$), o hasta que se genera una cantidad máxima de tokens.
+    \item Del mismo modo, se podría realizar \textbf{generación condicional} comenzando con una secuencia de tokens iniciales, $S_0=(w_1,\ldots,w_t)$.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Generación}
+Se debe fijar cómo elegir el próximo token a partir de la distribución $p_\theta(w_{t+1}|w_1,\ldots,w_t)\sim\operatorname{Cat}\left(\mathcal{V};\lambda_\theta(w_1,\ldots,w_t)\right)$.
+\begin{itemize}
+    \item \textbf{Greedy decoding:} elige el siguiente token como el token más probable según el modelo:
+    \begin{equation*}
+        w_{t+1}=a_k,\quad\text{donde}\quad
+k=\operatornamewithlimits{arg\,max}_{k\in\{1,\ldots,|\mathcal{V}|\}} \lambda_\theta(w_1,\ldots,w_t)_k.
+    \end{equation*}
+    \item \textbf{Sampling:} elige $w_{t+1}$ sampleando desde $p_\theta(w_{t+1}|w_1,\ldots,w_t)$.
+    \item \textbf{Top-$K$:} si $\mathcal{I}=\{k_1,\ldots,k_K\}$ son las $K$ coordenadas donde el vector $\lambda_\theta(w_1,\ldots,w_t)$ toma los valores más altos, samplea usando
+    \begin{equation*}
+        \tilde\lambda_\theta(w_1,\ldots,w_t)_k=
+\begin{cases}
+0&\text{si }k\not\in\mathcal{I}\\
+\frac{\lambda_\theta(w_1,\ldots,w_t)_k}{\sum_{i\in\mathcal{I}}\lambda_\theta(w_1,\ldots,w_t)_i}&\text{si } k\in\mathcal{I}
+\end{cases}.
+    \end{equation*}
+    Notar que $K=1$ equivale a la generación greedy, mientras que $K=|\mathcal{V}|$ equivale al sampling usando el vector original.
+\end{itemize} 
+\end{frame}
+
+\begin{frame}{Temperatura}
+
+\begin{itemize}
+    \item Si $l\in\R^{|\mathcal{V}|}$ es el vector de logits entregado por el modelo y $T>0$ es un parámetro de \textbf{temperatura} se puede escalar el vector de logits $l\mapsto \frac{1}{T}l$ antes de aplicar la función softmax.
+    \item si $T>1$, esta transformación lleva todos los logits a una escala similar.
+    \item Si $T<1$, esta transformación destaca aún más el logit del token más probable.
+    \item $T\to 0$ equivale a la generación greedy, mientras que si $T\to\infty$ el vector de probabilidades se vuelve uniforme.
+    \item Por lo tanto, el parámetro $T$ permite controlar el trade-off entre versatilidad y confianza en la generación.
+\end{itemize}
+\end{frame}
+
+
+
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Implementación y entrenamiento de la arquitectura GPT.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 5: Modelos autorregresivos y LLMs (parte I)}
+\end{frame}
+
+\end{document}
