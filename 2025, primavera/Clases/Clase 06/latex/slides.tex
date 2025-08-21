@@ -1,0 +1,243 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 6: Modelos autorregresivos y LLMs (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Arquitectura GPT}
+
+\begin{frame}{Layer normalization}
+
+    \begin{itemize}
+        \item La aplicación consecutiva de varias capas neuronales suele afectar el entrenamiento de la red (p.g. por \textbf{vanishing gradient} o \textbf{exploding gradient}).
+        \item Esto se puede mitigar agregando \textbf{capas de normalización} entremedio de los bloques de la red.
+        \item Por ejemplo, en redes convolucionales es usual utilizar \textbf{batch normalization} o \textbf{group normalization}.
+        \item No es obvio cómo aplicar batch norm en modelos secuenciales: las secuencias de tokens no suelen tener el mismo largo y muchas veces los batches de entrenamiento deben ser pequeños.
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Layer normalization}
+    Para una secuencia de embeddings, \textbf{layer normalization} normaliza cada vector de embedding de forma individual.
+
+    Para un vector de embedding de la secuencia, $x\in\R^{D}$, primero se obtiene el embedding normalizado $\tilde x\in\R^D$, donde:
+    \begin{equation*}
+        \tilde x_d = \frac{x_d - \mu}{\sigma},
+        \quad\text{para}\quad
+        \mu = \frac{1}{D} \sum_{d=1}^{D} x_d
+        \quad\text{y}\quad
+        \sigma^2 = \frac{1}{D} \sum_{d=1}^{D} (x_d - \mu)^2
+    \end{equation*}
+    Luego, de forma análoga a lo realizado por batch norm, layer norm aplica una transformación coordenada a coordenada:
+    \begin{equation*}
+        \text{LayerNorm}(x) = \alpha \odot \tilde x + \beta,
+    \end{equation*}
+
+    donde $\alpha,\beta\in\R^D$ son parámetros entrenables.
+
+\end{frame}
+
+\begin{frame}{Self-attention}
+
+    Dada un una secuencia de embeddings, $(x_1,\ldots,x_T)\subset\R^D$:
+
+    \begin{itemize}
+        \item El objetivo del \textbf{mecanismo de auto-atención} es obtener una secuencia de \textit{embeddings mejorados}, $(y_1,\ldots,y_T)\subset\R^P$.
+        \item Cada \textbf{embedding contextual} $y_t\in\R^P$ combina el respectivo embedding $x_t\in\R^D$ con todos los otros vectores de embedding, $(x_1,\ldots,x_T)$, para poder incorporar información contextual.
+        \item Esto soluciona el problema de \textbf{memoria a largo plazo} presente en las redes recurrentes.
+        \item Además, el procesamiento de una secuencia de embeddings es \textbf{paralelizable}, lo que permite escalar el entrenamiento. Esto no es posible con las redes recurrentes.
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Self-attention}
+    \begin{itemize}
+        \item Se comienza proyectando cada vector de embeddings de la secuencia $(x_1,\ldots,x_T)\subset\R^D$ a $\R^P$.
+              Es necesario proyectar 3 veces:
+              \begin{equation*}
+                  q_t=W_Q\,x_t,
+                  \qquad
+                  k_t=W_K\,x_t,
+                  \qquad
+                  v_t=W_V\,x_t,
+                  \quad\forall t\in\{1,\ldots,T\}.
+              \end{equation*}
+        \item $W_Q,W_K,W_V\in\mathcal{M}_{P,D}(\R)$ son parámetros entrenables.
+        \item Cada embedding mejorado $y_i\in\R^P$ se calcula como
+              \begin{equation*}
+                  y_i=\sum_{j=1}^T a_{ij}\,v_j,
+                  \quad\text{donde}\quad  a_{ij}\geq 0 \text{ y } \sum_{j=1}^T a_{ij}=1
+              \end{equation*}
+        \item $a_{ij}\in[0,1]$ representa la \textbf{atención} que coloca el token $i$ al token $j$. Una elección típica es \textbf{scaled dot-product attention}:
+              \begin{equation*}
+                  a_{ij}= \frac{e^{s_{ij}}}{\sum_{t=1}^T e^{s_{it}}}
+                  \quad\text{donde}\quad
+                  s_{ij}=\frac{\langle q_i,k_j\rangle}{\sqrt{P}}
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Self-attention}
+
+    Para paralelizar el cálculo de $(y_1,\ldots,y_T)\subset\R^P$ es necesario guardar las proyecciones en matrices $Q,K,V\in \mathcal{M}_{T,P}(\R)$:
+
+    \begin{equation*}
+        Q=\left(
+        \begin{matrix}
+            q_1^\top \\
+            \vdots   \\
+            q_T^\top
+        \end{matrix}
+        \right),
+        \qquad
+        K=\left(
+        \begin{matrix}
+            k_1^\top \\
+            \vdots   \\
+            k_T^\top
+        \end{matrix}
+        \right),
+        \qquad
+        V=\left(
+        \begin{matrix}
+            v_1^\top \\
+            \vdots   \\
+            v_T^\top
+        \end{matrix}
+        \right),
+    \end{equation*}
+
+    Dado que$(QK^\top)_{ij}= \langle q_i,k_j\rangle$, entonces $s_{ij}=\left(\frac{QK^\top}{\sqrt{P}}\right)_{ij}$. Además, notando que $A=\text{softmax}_\text{por filas}\left(S\right)$, se tiene que:
+
+
+    \begin{equation*}
+        \left(
+        \begin{matrix}
+            y_1^\top \\
+            \vdots   \\
+            y_T^\top
+        \end{matrix}
+        \right)=\text{softmax}_\text{por filas}\left(\frac{QK^\top}{\sqrt{P}}\right)V
+        \in\mathcal{M}_{T,P}(\R)
+    \end{equation*}
+
+\end{frame}
+
+\begin{frame}{Masked self-attention}
+
+    \begin{itemize}
+        \item La auto-atención anterior pierde la \textbf{causalidad} del lenguaje al momento de computar los embeddings contextuales $(y_1,\ldots,y_T)$.
+        \item Cada embedding contextual $y_t\in\R^P$ solo debe poder acceder a los embeddings $x_1,\ldots,x_t$ y no a los embeddings futuros, $x_{t+1},\ldots,x_T$.
+        \item Por lo tanto, se debe \textbf{enmascarar} el futuro forzando que $a_{ij}=0$ para $j>i$. \item No se puede simplemente sustituir $a_{ij}=0$ para $j>i$ ya que se dejaría de cumplir $\sum_{j=1}^T a_{ij}=1$.
+        \item El cambio se debe realizar previo al softmax: en $S\in\mathcal{M}_{T,T}(\R)$ sustituir  cada entrada donde $j>i$ por un valor muy negativo.
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Multihead self-attention}
+
+    \begin{itemize}
+        \item En las redes convolucionales es usual utilizar varios filtros para capturar diferentes patrones.
+        \item De forma análoga, en el mecanismo de auto-atención se pueden utilizar múltiples cabezales de atención para capturar diferentes relaciones entre los tokens.
+    \end{itemize}
+
+    Si $(x_1,\ldots,x_T)\subset\R^D$ es una secuencia de vectores de embeddings e $(y_1^{(h)},\ldots,y_T^{(h)})\subset\R^P$ es la salida de la $h$-ésima cabeza de atención, entonces pueden concatenar
+
+    \begin{equation*}
+        \tilde y_t=\left(y_t^{(1)}\,\cdots\, y_t^{(H)}\right)\in\R^{P\cdot H},\quad \text{para } t\in\{1,\ldots,T\}
+    \end{equation*}
+
+    Los embeddings finales que retorna un MHSA son de la forma $u_t=W_0\, \tilde y_t\in\R^D$, donde la matriz $W_0\in\mathcal{M}_{P\cdot H,D}(\R)$ proyecta los embeddings de vuelta al espacio $\R^D$. 
+
+\end{frame}
+
+\begin{frame}{Red feedforward}
+
+El último paso que realiza un bloque Transformer es pasar cada uno de los embeddings contextuales, $(u_1,\ldots,u_T)\subset\R^D$, por una misma MLP de dos capas. Para $t\in\{1,\ldots,T\}$:
+
+\begin{equation*}
+    \text{FF}(u_t)=W_2\,\phi\left(W_1\,u_t\right),
+\end{equation*}
+
+\begin{itemize}
+    \item $W_1\in\mathcal{M}_{J,D}(\R)$, $W_2\in\mathcal{M}_{D,J}(\R)$ son los parámetros de la red.
+    \item  $\phi:\R\to\R$ es una función de activación que se aplica coordenada a coordenada.
+    \item Es usual considerar $J\gg D$ para darle más capacidad de representación a la red.
+\end{itemize}
+
+
+\end{frame}
+
+\begin{frame}{Bloque Transformer}
+
+    Si secuencia de embeddings, $(x_1,\ldots,x_T)\subset\R^D$, se almacena en una matriz $X\in\mathcal{M}_{T,D}(\R)$, un \textbf{bloque Transformer} tiene la siguiente estructura:
+    \begin{equation*}
+        \begin{cases}
+Y=X+\text{Dropout}(\text{MHSA}(\text{LayerNorm}(X)))\\
+\text{TransformerBlock}(X) = Y + \text{Dropout}(\text{FF}(\text{LayerNorm}(Y)))
+\end{cases}
+    \end{equation*}
+
+    Las capas de normalización y la red feed forward se aplican de forma individual sobre cada vector de embedding (i.e., por filas).
+
+\end{frame}
+
+\begin{frame}{Arquitectura}
+        Con esto, la arquitectura GPT realiza lo siguiente:
+
+    \begin{itemize}
+        \item Recibe una secuencia de tokens de entrada, $(w_1,\ldots,w_T)\in\mathcal{V}^*$.
+        \item Esta secuencia es pasada por una capa de embedding inicial.
+        \item El Transformer es \textbf{equivariante bajo permutación}, por lo que se debe sumar un \textbf{positional encoding} a cada embedding.
+        \item Estos embeddings iniciales son pasados por varios bloques Transformer consecutivos.
+        \item Finalmente, se agrega un cabezal de lenguaje que cambia la dimensión de la salida a la dimensión del vocabulario.
+    \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Revisión de variaciones de la arquitectura Transformer.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 6: Modelos autorregresivos y LLMs (parte II)}
+\end{frame}
+
+\end{document}
