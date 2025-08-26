@@ -1,0 +1,234 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 7: Modelos autorregresivos y LLMs (parte III)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Tokenizadores}
+
+\begin{frame}{Problema de tokenización}
+    Dado un corpus de entrenamiento, es necesario elegir un \textbf{algoritmo de tokenización}, el cual definirá el vocabulario $\mathcal{V}$ sobre el que se tokenizará dicho corpus.
+    \begin{itemize}
+        \item Aumentar $|\mathcal{V}|$ aumenta la cantidad de parámetros del modelo.
+        \item Disminuir $|\mathcal{V}|$ provoca que las secuencias de tokens sean más largas, lo cual aumenta el costo de procesamiento.
+    \end{itemize}
+    Encontrar la \textit{mejor} tokenización es un problema NP-completo, por lo que se debe recurrir a métodos aproximados.
+\end{frame}
+
+\begin{frame}{Byte pair encoding}
+    Uno de los algoritmos de tokenización más usuales es el algoritmo \textbf{byte pair encoding (BPE)}:
+    \begin{itemize}
+        \item Comienza considerando cada caracter como un token de $\mathcal{V}$.
+        \item Luego, forma nuevos tokens combinando cadenas de caracteres de acuerdo a su frecuencia de ocurrencia en el corpus.
+        \item Para esto, calcula la frecuencia de todos los bigramas en el corpus y agrega al vocabulario el bigrama con mayor frecuencia.
+        \item Este proceso se repite hasta que se alcanza el tamaño de vocabulario deseado.
+        \item Otros algoritmos como \textbf{WordPiece} siguen enfoques similares.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Tokens especiales}
+    Es usual incluir \textbf{tokens especiales} que cumplen funciones específicas en el modelo. Algunos ejemplos son:
+    \begin{itemize}
+        \item \textbf{$\text{<SEP>}$:} usado para separar dos partes de la secuencia.
+        \item \textbf{$\text{<CLS>}$:} usado como embedding de la secuencia completa.
+        \item \textbf{$\text{<MASK>}$:} usado para enmascarar partes de la secuencia.
+        \item \textbf{$\text{<TOOL>}$:} usado para indicar el uso de herramientas externas.
+        \item \textbf{$\text{<SYSTEM>}$, $\text{<USER>}$, $\text{<ASSISTANT>}$:} usado para indicar roles en una conversación.
+    \end{itemize}
+    Por otro lado, es usual fijar $|\mathcal{V}|$ cercano a un múltiplo de 64, lo que suele agregar tokens vacíos. Estos tokens vacíos luego se pueden usar, mediante fine tuning, como tokens especiales.
+\end{frame}
+
+\section{Positional encoding}
+
+\begin{frame}{Embeddings posicionales absolutos}
+    La información inyectada por los embeddings posicionales influye directamente en el mecanismo de atención:
+    \begin{equation*}
+        y_i=\sum_{j=1}^T a_{ij}\,v_j,
+        \quad\text{donde}\quad
+        a_{ij}= \frac{\exp\left(\frac{\langle q_i,k_j\rangle}{\sqrt{P}}\right)}{\sum_{t=1}^T \exp\left(\frac{\langle q_i,k_t\rangle}{\sqrt{P}}\right)}
+    \end{equation*}
+    Cada vector $q_t,k_t,v_t\in\R^P$ es calculado como una proyección $x_t\mapsto W(x_t+p_t)$ del embedding $x_t\in\R^D$ al espacio $\R^P$, donde el vector $p_t\in\R^D$ es un \textbf{embedding posicional absoluto}.
+
+    Distintas formas de definir los embeddings $p_1,\ldots,p_T\in\R^D$ definen distintos mecanismos de positional encoding.
+\end{frame}
+
+\begin{frame}{Embeddings posicionales sinusoidales}
+    Si bien se puede utilizar una matriz de embedding, otra opción es utilizar \textbf{embeddings sinusoidales}:
+    \begin{equation*}
+        p_t=
+        \left(
+        \begin{matrix}
+                \sin(\omega_1 t) \\ \cos(\omega_1 t)\\ \vdots \\ \sin(\omega_{D/2} t)\\ \cos(\omega_{D/2} t)
+            \end{matrix}
+        \right)\in[-1,1]^D
+    \end{equation*}
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item Las \textbf{frecuencias de oscilación}, $\omega_1,\ldots,\omega_{D/2}>0$, suelen elegirse siguiendo una progresión geométrica decreciente.
+        \item Es decir, $\omega_k = b^{-\frac{k}{D}}$, donde $b>1$ es un hiperparámetro.
+        \item Notar que este mecanismo no utiliza parámetros entrenables.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Embeddings posicionales relativos}
+    También es posible utilizar \textbf{embeddings relativos}, los cuales codifican la distancia relativa entre los tokens de la secuencia:
+    \begin{itemize}
+        \item Para el cálculo de atención de un token $q_i\in\R^P$ sobre un par key-value $(k_j,v_j)\in\R^P\times\R^P$, los embedding posicionales relativos codifican la distancia (con signo) $r=j-i\in\Z$.
+        \item Para esto, se pueden redefinir las proyecciones iniciales como
+              \begin{equation*}
+                  q_i=W_Q x_i,
+                  \quad
+                  k_j=W_K(x_j+p^k_r),
+                  \quad
+                  v_j=W_V(x_j+p^v_r),
+              \end{equation*}
+              donde $p^k_r, p^v_r\in\R^D$ son vectores de embedding (entrenables) asociados a la distancia relativa entre los tokens, $r=j-i$.
+        \item Una variante importante es \textbf{rotary positional embedding (RoPE)}, la cual combina posición relativa con embeddings sinusoidales.
+    \end{itemize}
+\end{frame}
+
+\section{Mecanismos de normalización}
+\begin{frame}{Layer normalization}
+
+    \textbf{Layer normalization} normaliza (en media y varianza) cada vector de embedding individualmente:
+    \begin{equation*}
+        \text{LayerNorm}(x) := \alpha \odot \tilde{x} + \beta,
+        \quad\text{donde}\quad
+        \tilde{x} = \frac{x - \text{mean}(x)}{\text{std}(x)}
+    \end{equation*}
+    La ubicación de esta capa de normalización dentro de los bloques MHSA y FF influye en la estabilidad del entrenamiento:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item \textbf{Post-LN:} es de la forma $x\mapsto\text{LayerNorm}(x+\text{SubLayer}(x))$
+        \item \textbf{Pre-LN:} es de la forma $x\mapsto x+\text{SubLayer}(\text{LayerNorm}(x))$
+    \end{itemize}
+    Hoy en día se prefiere la arquitectura Pre-LN ya que genera una dinámica de entrenamiento más estable.
+\end{frame}
+
+\begin{frame}{Mecanismos de normalización}
+    Otra técnica de normalización usual es \textbf{RMS normalization}, la cual calcula, para cada vector de embedding $x\in\R^D$:
+    \begin{equation*}
+        \text{RMSNorm}(x) = \alpha \odot \frac{x}{\text{rms}(x)},
+        \quad\text{donde}\quad
+        \text{rms}(x) = \sqrt{\frac{1}{D}\sum_{i=1}^{D} x_i^2}
+    \end{equation*}
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item Notar que $ \alpha \in \mathbb{R}^{D} $ es el único parámetro entrenable.
+        \item RMSNorm normaliza todos los embeddings a una misma esfera de radio $\frac{1}{\sqrt{D}}$, la cual luego puede deformarse gracias al parámetro de escala $\alpha\in\R^D$.
+        \item Este método de normalización se ha vuelto usual debido a que se puede computar eficientemente.
+    \end{itemize}
+\end{frame}
+
+\section{Mecanismos de atención}
+
+\begin{frame}{Atención aditiva y multiplicativa}
+    Dada la importancia del mecanismo de atención, encontrar otras maneras definirlo puede mejorar considerablemente la eficiencia y rendimiento de un modelo.
+
+    Para un vector query $q_i\in\R^P$ y un vector key $k_j\in\R^P$, se podría definir el score de atención, $s_{ij}\in\R$, de dos formas naturales:
+    \begin{itemize}
+        \item \textbf{Atención aditiva:} $s_{ij}=W_0\tanh\left(W_1q_i+W_2k_j\right)$.
+        \item \textbf{Atención multiplicativa:} $s_{ij}=q_i^\top W k_j$.
+    \end{itemize}
+    \textbf{Scaled dot-product attention} (atención estándar) equivale a fijar $W=\frac{1}{\sqrt{P}}\text{I}_P$ en la atención multiplicativa.
+
+    La división por $\sqrt{P}$ se realiza para que $\operatorname{Var}\left(\frac{\langle q_i, k_j\rangle}{\sqrt{P}}\right)=1$, lo que permite controlar los logits que entrarán a la función $\text{softmax}$.
+\end{frame}
+
+\begin{frame}{Proyecciones en el mecanismo de atención}
+    Por otro lado, las 3 proyecciones iniciales $x_t\mapsto Wx_t$ realizadas en el cálculo de los vectores $q_t,k_t,v_t\in\R^P$ se utilizan para:
+    \begin{itemize}
+        \item \textbf{Evitar $A\in\mathcal{M}_{T,T}(\R)$ diagonal:} si se definiera $s_{ij} = \frac{\langle x_i, x_j\rangle}{\sqrt{P}}$, entonces cada token siempre se colocaría más atención a sí mismo.
+        \item \textbf{Proyecciones especializadas:} usar tres proyecciones distintas permite que los vectores $q_t,k_t,v_t\in\R^P$ se puedan adaptar a su rol dentro del mecanismo de atención.
+        \item \textbf{Reducir dimensión:} dado que $P\ll D$, las proyecciones permiten realizar el cálculo de atención sobre matrices más pequeñas.
+        \item \textbf{Añadir parámetros:} las matrices de proyección son los únicos parámetros entrenables dentro de un cabezal de atención.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Atención cruzada}
+    El mecanismo de auto-atención puede ser extendido a un mecanismo de \textbf{atención cruzada}, donde una secuencia de embeddings, $(x_1,\ldots,x_{ T})\subset \R^D$ coloca atención sobre otra secuencia de embeddings, $(\tilde x_1,\ldots,\tilde x_{\tilde T})\subset \R^{\tilde D}$. Para esto:
+    \begin{itemize}
+        \item Se calculan los vectores query como $q_i=W_Q x_i\in\R^P$ ($i\in\{1,\ldots,T\}$) usando la primera secuencia.
+        \item Se calculan los vectores key y value como $k_j=W_K \tilde x_j\in\R^P$ y $v_j=W_V \tilde x_j\in\R^P$ ($j\in\{1,\ldots,\tilde T\}$) usando la segunda secuencia.
+        \item Se aplica el mecanismo de atención usual.
+    \end{itemize}
+    Notar que no es necesario que $T=\tilde T$ ni que $D=\tilde D$.
+\end{frame}
+
+\section{Mixture of experts}
+
+\begin{frame}{Mixture of experts}
+    Luego de un bloque MHSA es usual aplicar un bloque FF ($x_t\mapsto\text{FF}(x_t)=W_2\,\phi\left(W_1\,u_t\right)$), el cual procesa individualmente cada embedding $x_t\in\R^D$ obtenido en el bloque MHSA.
+
+    Una extensión es el mecanismo de \textbf{mixture of experts (MoE)}:
+    \begin{itemize}
+        \item Se considera un conjunto de $M\geq 1$ expertos, $\{\text{FF}_1,\ldots,\text{FF}_M\}$, cada uno con sus propios parámetros.
+        \item Así, la salida es una combinación convexa de los expertos, donde los ponderadores son determinados por un \textbf{enrutador}:
+              \begin{equation*}
+                  \text{MoE}(x_t) = \sum_{m=1}^M \pi_m(x_t)\,\text{FF}_m(x_t)
+                  \quad\text{donde}\quad
+                  \pi(x_t)=\text{softmax}(W_r x_t)
+              \end{equation*}
+        \item Para reducir el costo computacional se usa \textbf{top-$K$ gating}, donde solo los $K\ll M$ expertos más probables procesan cada $x_t$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Otros componentes de la arquitectura Transformer}
+    Los otros dos componentes de la arquitectura estudiada son las \textbf{conexiones residuales} y el uso de \textbf{dropout}:
+    \begin{itemize}
+        \item Las conexiones residuales $x\mapsto x+\text{Bloque}(x)$ promueven gradientes más estables a lo largo de todas las capas, por lo que ayudan a mitigar el vanishing gradient problem.
+        \item Más aún, se ha demostrado empíricamente que las conexiones residuales promueven una función objetivo más \textit{plana}.
+        \item Es común aplicar dropout a capas que tienen muchos parámetros ya que son más propensas al overfitting.
+        \item Hoy en día muchos modelos no utilizan dropout.
+    \end{itemize}
+    
+
+    
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Otros modelos tipo Transformer (BERT, ViT, Chameleon, CLIP).
+        \item LLMs (chat templates, leyes de escala, habilidades emergentes, algunos LLMs famosos).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 7: Modelos autorregresivos y LLMs (parte III)}
+\end{frame}
+
+\end{document}
