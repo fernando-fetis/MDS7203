@@ -1,0 +1,234 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 8: Modelos autorregresivos y LLMs (parte IV)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Otros modelos tipo Transformer}
+
+\begin{frame}{BERT | bidirectional encoder representations from transformers}
+    \textbf{BERT} es un modelo tipo Transformer usado para tareas de comprensión del lenguaje.
+    \begin{itemize}
+        \item La entrada al modelo puede ser una secuencia de tokens $S\in\mathcal{V}^*$ o dos secuencias de tokens $S_1,S_2\in\mathcal{V}^*$ concatenadas.
+        \item No sigue un enfoque autorregresivo, por lo que no necesita masking causal y no puede generar texto.
+        \item Los embeddings contextuales obtenidos con BERT pueden ser usados para otras tareas. También es posible obtener un embedding representante de toda la secuencia de entrada.
+        \item BERT utiliza 3 tokens especiales: \textbf{$\text{<MASK>}$}, \textbf{$\text{<CLS>}$} y \textbf{$\text{<SEP>}$}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{BERT | tokenización}
+    \begin{itemize}
+        \item BERT añade el token $\text{<CLS>}$ al comienzo. Su emmbedding contextual es usado como la representación agregada de la entrada.
+        \item Las secuencias $S_1,S_2\in\mathcal{V}^*$ concatenadas son separadas por el token $\text{<SEP>}$, y cada secuencia incluye un embedding adicional.
+    \end{itemize}
+    \insertimage{bert_1}{1}
+\end{frame}
+
+\begin{frame}{BERT | entrenamiento}
+    BERT se entrena mediante dos tareas autosupervisadas:
+    \begin{itemize}
+        \item \textbf{Masked language model:} se ocultan tokens en la secuencia de entrada (se cambian por $\text{<MASK>}$) y el modelo debe predecirlas.
+        \item \textbf{Next sentence prediction:} el modelo debe predecir si el texto $S_2\in\mathcal{V}^*$ es la continuación del texto $S_1\in\mathcal{V}^*$.
+    \end{itemize}
+    \insertimage{bert_2}{0.5}
+\end{frame}
+
+\begin{frame}{BERT | uso}
+    \begin{itemize}
+        \item Una vez entrenado, BERT puede ser usado para clasificar secuencias individuales o pares de secuencias. Para esto utiliza el embedding contextual del token $\text{<CLS>}$.
+        \item Es necesario cambiar el cabezal de clasificación original por otro cabezal específico para la tarea y hacer \textbf{fine tuning}.
+    \end{itemize}
+    \insertimage{bert_3}{1}
+\end{frame}
+
+\begin{frame}{Arquitecturas encoder-decoder | modelo seq2seq}
+    Si se tiene un modelo autorregresivo condicional $p(S|S_\text{contexto})$, donde $S_\text{contexto}\in\mathcal{V}^*$ es una secuencia condicional, entonces es posible procesar ambas secuencias por modelos diferentes:
+    \begin{itemize}
+        \item Un \textbf{encoder} procesa $S_\text{contexto}$ y genera una representación contextual para $S_\text{contexto}$.
+        \item Un \textbf{decoder} genera autorregresivamente la secuencia $S\in\mathcal{V}^*$ utilizando la representación contextual obtenida con el encoder.
+    \end{itemize}
+    \insertimage{seq2seq}{1}
+\end{frame}
+
+\begin{frame}{Arquitecturas encoder-decoder | arquitectura Transformer}
+    El modelo \textbf{encoder-decoder}, también llamado \textbf{seq2seq}, fue modelado originalmente usando RNNs. Sin embargo, también se puede utilizar una arquitectura \textbf{Transformer}:
+    \begin{itemize}
+        \item Un encoder tipo BERT procesa todo el contexto de entrada $S_\text{contexto}$.
+        \item Un decoder tipo GPT genera la secuencia $S$ utilizando la representación contextual obtenida con el encoder.
+        \item Para esto, el decoder agrega un bloque de \textbf{atención cruzada} hacia las representaciones contextuales del encoder.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Arquitecturas encoder-decoder | arquitectura Transformer}
+    \begin{columns}
+        \begin{column}{0.55\textwidth}
+            \begin{itemize}
+                \item GPT y BERT son arquitecturas derivadas del Transformer original.
+                \item Hoy en día la mayoría de los modelos son de tipo GPT (\textbf{decoder-only}).
+                \item Modelos encoder-decoder como \textbf{T5} siguen siendo ampliamente utilizados en modelos text-to-image.
+                \item Los Transformers también tienen propiedades de aproximación universal y son turing-completos.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.45\textwidth}
+            \insertimage{transformer}{1}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Vision Transformer | patchificación}
+    \begin{itemize}
+        \item BERT es un buen clasificador de secuencias, lo que motiva a transformar una imagen en una secuencia para usar BERT.
+        \item La atención tiene costo cuadrático, por lo que no se podrían clasificar imágenes de alta resolución si se trata cada pixel como un token embedding de dimensión $I\times I\times C$.
+        \item \textbf{Vision Transformer (ViT)} propone dividir la imagen en \textbf{patches}, donde cada patch aplanado se trata como un token.
+    \end{itemize}
+    \insertimage{patchification}{0.5}
+\end{frame}
+
+\begin{frame}{Vision Transformer | clasificación}
+    \begin{itemize}
+        \item Al igual que en BERT, se agrega un token especial $\text{<CLS>}$ cuyo embedding se utiliza para la clasificación.
+        \item Una vez entrenado, se puede sustituir el cabezal de clasificación por otro y hacer fine tuning.
+        \item ViT en general funciona mejor que una CNN pero requiere una gran cantidad de datos para su entrenamiento.
+    \end{itemize}
+    \insertimage{vit}{0.5}
+\end{frame}
+
+\begin{frame}{CLIP | contrastive language-image pretraining}
+    \begin{itemize}
+        \item Se puede usar un image encoder (p.g. ViT) y un text encoder (p.g. BERT) para obtener representaciones de imágenes y texto en un mismo espacio de embedding.
+        \item \textbf{CLIP} logra esto utilizando un \textbf{enfoque contrastivo}. En particular, CLIP no es un modelo generativo.
+    \end{itemize}
+    \insertimage{clip_1}{0.7}
+\end{frame}
+
+\begin{frame}{CLIP | entrenamiento}
+    Si $ \mathcal{D}=\{(x_n, t_n)\}_{n=1}^N$, es un conjunto de pares de imágenes $x_n\in\R^{D_\text{imagen}}$ con sus respectivos textos descriptivos $t_n\in\mathcal{V}^*$:
+    \begin{itemize}
+        \item Se calculan los vectores de embedding $\mathrm{ImageEncoder}(x_n)\in\R^{D_\text{I}}$ y $\mathrm{TextEncoder}(t_n)\in\R^{D_\text{T}}$ para cada instancia $(x_n, t_n)\in\mathcal{D}$.
+        \item Estos embeddings son proyectados a un espacio común, $\R^D$, para obtener nuevos embeddings $I_n,T_n\in\R^D$.
+        \item De este modo, CLIP se entrena maximizando
+              \begin{equation*}
+                  \sum_{i=1}^N \log\left(\frac{\exp(L_{ii})}{\sum_{j=1}^N \exp(L_{ij})}\right) +
+                  \sum_{j=1}^N \log\left(\frac{\exp(L_{jj})}{\sum_{i=1}^N \exp(L_{ij})}\right),
+              \end{equation*}
+              donde $L_{ij}=s_\theta\cdot\text{SimilitudCoseno}(I_i, T_j)\in\R$, con $s_\theta>0$ un parámetro de temperatura (inversa) entrenable.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{CLIP | usos}
+    \begin{itemize}
+        \item Una vez entrenado, se puede comparar la similitud entre una imagen y un texto mediante la similitud coseno de sus respectivos vectores de embedding (proyectados al espacio común).
+        \item Se puede usar CLIP como un \textbf{open-vocabulary classifier} comparando una imagen con un conjunto de textos de la forma
+              \begin{equation*}
+                  S_{\text{<CLASE>}}="\text{una imagen de un/una <CLASE>.}"
+              \end{equation*}
+    \end{itemize}
+    \insertimage{clip_2}{0.5}
+\end{frame}
+
+\begin{frame}{Chameleon}
+    El modelo \textbf{Chameleon} utiliza la técnica de patchificación de imágenes para entrenar un modelo autorregresivo tipo GPT para generar texto e imágenes de manera conjunta.
+    \insertimage{chameleon}{0.9}
+\end{frame}
+
+\section{Large language models}
+
+\begin{frame}{Leyes de escala}
+    \begin{itemize}
+        \item El entrenamiento auto-supervisado permite escalar fácilmente un LLM ya que es fácil obtener datos de entrenamiento.
+        \item Un LLM se puede escalar en el \textbf{número de parámetros}, en la \textbf{cantidad de datos} de entrenamiento y en la \textbf{cantidad de cómputo} usada para entrenar.
+        \item Se ha demostrado empíricamente que la loss de un LLM sigue algunas \textbf{leyes de escala} de la forma $y=ax^{-p}$, con $a,p>0$.
+        \item En escala logarítmica, $\tilde y=\log(ax^{-p})=-p\tilde x+\log a$ es una recta.
+              \insertimage{scale_1}{0.9}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    \begin{itemize}
+        \item Las leyes de escala se han verificado empíricamente en un amplio rango de parámetros y en diversos datasets de entrenamiento.
+        \item Estas leyes permiten estimar el rendimiento de un entrenamiento mucho más costoso, lo que entrega confianza para escalar.
+        \item El rendimiento de un LLM no depende fuertemente de algunos hiperparámetros de arquitectura (\textbf{the bitter lesson}).
+              \insertimage{scale_2}{1}
+        \item Estos patrones permiten ajustar hiperparámetros en modelos pequeños y luego extrapolarlos a modelos más grandes, donde solo se puede entrenar una única vez.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    \begin{itemize}
+        \item No todos los parámetros de entrenamiento deben ser escalados de la misma manera.
+              \insertimage{scale_3}{0.75}
+        \item \textbf{Chinchilla scaling laws:} dado un presupuesto de cómputo, permiten obtener la asignación de recursos óptima.
+        \item En particular, modelos más grandes entrenados menos tiempo pueden funcionar mejor que modelos más pequeños entrenados hasta la convergencia.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Habilidades emergentes}
+    \begin{itemize}
+        \item Una habilidad se dice \textbf{emergente} si no está presente en modelos más pequeños, sino que aparece de manera repentina en modelos más grandes.
+        \item Por definición, estas habilidades no son predecibles entrenando modelos más pequeños.
+    \end{itemize}
+    \insertimage{emergent_abilities}{0.6}
+\end{frame}
+
+\begin{frame}{Prompting}
+    \begin{itemize}
+        \item Una propiedad de los LLMs es su capacidad de seguir patrones. Por ejemplo, para una entrada $S\in\mathcal{V}^*$ de la forma
+              \begin{equation*}
+                  S=\text{"Q: ¿Cuál es la capital de Francia? R: "},
+              \end{equation*}
+              el LLM podría continuar la generación con "París" (un ARM no distingue entre la entrada y lo que ha generado).
+        \item Para comportamientos más complejos (p.g. \textbf{modelos conversacionales}), se suele realizar fine tuning y usar \textbf{templates}.
+        \item Del mismo modo se puede adaptar un LLM para \textbf{seguir instrucciones}, las cuales se indican en el \textbf{prompt}.
+        \item El prompting puede ser muy efectivo para guiar el comportamiento de un modelo (p.g. \textbf{chain of thought (CoT)} o \textbf{ReAct}).
+    \end{itemize}
+\end{frame}
+    
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item \textbf{Propiedades agénticas:} RAG, uso de herramientas, ReAct.
+        \item \textbf{Aspectos de optimización:} uso de memoria, implementaciones eficientes, heurísticas de entrenamiento.
+        \item \textbf{Fine tuning:} instruction fine tuning y LoRA.
+        \item 2º control de lectura.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 8: Modelos autorregresivos y LLMs (parte IV)}
+\end{frame}
+
+\end{document}
