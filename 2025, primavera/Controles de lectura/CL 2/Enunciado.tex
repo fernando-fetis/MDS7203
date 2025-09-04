@@ -1,0 +1,50 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº2}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Arquitectura Transformer}
+\begin{enumerate}[{\bf P1.}]
+	\item ¿Cuál es la función de la capa de atención en un Transformer y qué limitación de las RNNs ayuda a superar?
+	\item ¿Cuál es la función del token especial $\mathtt{<CLS>}$ en BERT?
+\end{enumerate}
+
+\section*{LLMs}
+\begin{enumerate}[{\bf P1.}]
+	\item En palabras, ¿qué indican las leyes de escala de los LLMs?
+	\item ¿Qué es una habilidad emergente en un LLM? Dé un ejemplo.
+\end{enumerate}
+
+
+
+\end{document}

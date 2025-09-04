@@ -1,0 +1,266 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 9: Modelos autorregresivos y LLMs (parte V)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Propiedades agénticas}
+
+\begin{frame}[fragile]{Modelos conversacionales}
+    Dada la capacidad de los modelos actuales y su capacidad de entender patrones y seguir instrucciones complejas, es posible construir un modelo conversacional usando \textbf{chat templates} (usualmente también se realiza fine tuning) de la forma
+
+    \tiny
+    \begin{verbatim}
+<|start|>
+<|system|>
+Eres un asistente útil y preciso que responde preguntas de cálculo. 
+Siempre entrega las derivadas paso a paso y utiliza notación matemática correcta.
+<|end|>
+
+<|user|>
+¿Cuál es la derivada de x^3?
+<|end|>
+
+<|assistant|>
+La derivada de x^3 es 3x^2.
+<|end|>
+
+<|user|>
+Gracias, y la derivada de x^x?
+<|end|>
+\end{verbatim}
+\end{frame}
+
+\begin{frame}{RAG}
+    También es posible acceder a información externa almacenada en bases de datos o en internet para complementar el conocimiento del LLM, disminuir las alucinaciones y mejorar sus respuestas.
+
+    \textbf{Retrieval-Augmented Generation (RAG)} consiste en codificar cada instancia de la base de datos en un embedding (p.g. usando un modelo tipo BERT) y luego guardar dicho embedding en una base de datos vectorial. De este modo:
+    \begin{itemize}
+        \item Dada una pregunta al LLM, se le calcula su embedding.
+        \item Se buscan los $K\in\N$ embeddings más similares (p.g. usando similitud coseno) en la base de datos vectorial.
+        \item Se agrega el texto asociado a estos embeddings al prompt que finalmente se entrega al LLM.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Uso de herramientas}
+    Más en general, es posible que el LLM utilice \textbf{herramientas externas} para responder preguntas o realizar tareas.
+
+    Para esto, se le suele entregar al LLM un prompt (usando un formato bien definido) con instrucciones de la forma
+
+    \scriptsize
+    \begin{verbatim}
+Eres un asistente que puede utilizar las siguientes herramientas:
+1. Calculadora: puedes usarla para realizar cálculos matemáticos.
+2. Buscador web: puedes usarlo para buscar información en internet.
+Cuando necesites usar una herramienta, responde con el formato:
+<|tool|>Nombre de la herramienta: entrada<|end|>
+Luego, espera a que te entreguen el resultado de la herramienta.
+Cuando tengas toda la información necesaria, responde con el formato:
+<|answer|>Tu respuesta aquí<|end|>
+\end{verbatim}
+
+    \normalsize
+    Un \textbf{parser} extrae la llamada a la herramienta y la respuesta del modelo.
+\end{frame}
+
+\begin{frame}{Uso de herramientas}
+    En general, el uso de herramientas requiere realizar fine tuning sobre el LLM para poder disminuir la probabilidad de que el modelo utilice mal las herramientas entregadas.
+
+    Por otro lado, se le suele pedir al modelo que el nombre de la herramienta a utilizar junto a sus parámetros sea entregado en formato JSON (para facilitar el parsing), el cual suele venir entre tokens especiales (p.g.$\text{<TOOL>}$), para facilitar su extracción.
+
+    También es posible pedirle al LLM que genere sus propias herramientas mediante código, las cuales luego puede ejecutar.
+\end{frame}
+
+\begin{frame}[fragile]{Modo agente}
+    Dada la capacidad de planificación de los modelos, es posible construir un \textbf{agente} que planifique y ejecute acciones para cumplir un objetivo.
+
+    Una técnica estándar para esto es \textbf{Reasoning and Acting (ReAct)}, donde el agente genera una secuencia de pasos de la forma
+
+    \small
+    \begin{verbatim}
+        Pensamiento: <...>.
+        Acción: <...>.
+        Observación: <...>.
+    \end{verbatim}
+    \vspace{-0.5cm}
+    Donde crea un plan de trabajo, ejecuta acciones (interrumpiendo temporalmente la generación), y luego añade al contexto del LLM los resultados obtenidos al ejecutar dichas acciones.
+
+    Este ciclo se repite hasta cumplir el objetivo.
+\end{frame}
+
+\section{Eficiencia y compresión en inferencia}
+
+\begin{frame}{Cantidad de parámetros y uso de memoria}
+    Para una red neuronal cualquiera, se pueden medir dos aspectos de eficiencia con respecto a ella:
+    \begin{itemize}
+        \item \textbf{Cantidad de parámetros:} asociada a la cantidad de memoria que se necesita para almacenar el modelo.
+        \item \textbf{Costo computacional de inferencia:} asociado a la cantidad de operaciones que se realizan al realizar un forward.
+    \end{itemize}
+    La cantidad de \textbf{VRAM} necesaria para realizar inferencia con un LLM escala (aproximadamente) de manera lineal con el número de parámetros del modelo.
+
+    Algunas técnicas de optimización permiten disminuir considerablemente la cantidad de VRAM necesaria.
+
+    Por otro lado, para el \textbf{entrenamiento} de un modelo es necesario contar con mucha más memoria y poder computacional.
+\end{frame}
+
+\begin{frame}{Cantidad de parámetros y uso de memoria}
+    Contando la cantidad de parámetros de la arquitectura GPT se observa que:
+    \begin{itemize}
+        \item El bloque FF tiene más parámetros que el bloque MHSA.
+        \item Si $|\mathcal{V}|$ es muy grande, la cantidad de parámetros en la capa de embedding y en el cabezal de lenguaje final se puede volver significativa.
+        \item Si cada parámetro se almacena con precisión \textbf{Float 32}, la cantidad de VRAM que se necesita es $\frac{\text{nº parámetros}\times 4}{1024\times1024}$ GB.
+        \item El cálculo de la atención tiene un \textbf{costo cuadrático} en el largo de la secuencia.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{KV caching}
+    Dada una secuencia de embeddings $S_\text{in}=(x_1,\ldots,x_T)\in\R^D$, la arquitectura GPT (previo al cabezal de lenguaje) genera otra secuencia $S_\text{out}=(y_1,\ldots,y_T)\in\R^D$.
+
+    Durante la generación con un LLM, solo es necesario calcular $y_T\in\R^D$ ya que $p_\theta(w_{T+1}|w_1,\ldots,w_T)\sim\text{Categórica}(\mathcal{V};r_\theta)$, donde $r_\theta\propto W_\text{out}y_T$. El vector $y_T\in\R^D$ se calcula como:
+    \begin{equation*}
+        y_T=\sum_{t=1}^T \frac{\exp\left(\frac{\langle q_T,k_t\rangle}{\sqrt{P}}\right)}{\sum_{r=1}^T \exp\left(\frac{\langle q_T,k_r\rangle}{\sqrt{P}}\right)}\,v_t
+    \end{equation*}
+    Por lo que los vectores $\{k_1,\ldots,k_{T+1}\},\{v_1,\ldots,v_{T+1}\}\subset\R^P$ pueden ir siendo almacenados en memoria para no tener que volver a calcularlos. Esta técnica se conoce como \textbf{KV caching}.
+\end{frame}
+
+\begin{frame}{Cuantización}
+    \begin{itemize}
+        \item En una regresión lineal unidimensional, $y(x)=ax+b$, es posible modificar levemente la precisión de los parámetros $a,b\in\R$ sin afectar significativamente la predicción $y(x)\in\R$.
+        \item Esta intuición se puede extender para reducir la precisión de los parámetros de un LLM sin afectar significativamente su rendimiento. Esta técnica se conoce como \textbf{cuantización}.
+        \item La cuantización permite reducir la cantidad de memoria necesaria para almacenar un modelo, a costa de una leve pérdida en su rendimiento.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Destilación}
+    Es posible entrenar un modelo más pequeño (\textbf{student}) para que imite el comportamiento de un modelo más grande (\textbf{teacher}). Esta técnica se conoce como \textbf{destilación}.
+
+    La destilación se puede realizar de varias maneras, por ejemplo:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item \textbf{Soft targets:} en lugar de entrenar al modelo student con las hard-targets (one-hot) del trainset, se utilizan las distribuciones de probabilidad (soft targets) generadas por el teacher.
+        \item \textbf{Feature distillation:} se extraen características intermedias del teacher y se utilizan para guiar el entrenamiento del student.
+    \end{itemize}
+    También es posible destilar modelos tipo MoE entrenando un GPT estándar para que imite el comportamiento del modelo MoE. Esta técnica se conoce como \textbf{densification}.
+\end{frame}
+
+\begin{frame}{Pruning}
+    Se ha demostrado empíricamente que algunas capas de un Transformer no modifican de manera considerable los embedding de la secuencia de entrada, por lo que influyen menos en el comportamiento del modelo al momento de hacer inferencia.
+
+    Más aún, es posible remover algunas capas (\textbf{pruning}) de un modelo tipo Transformer ya entrenado sin afectar significativamente su rendimiento.
+
+    Si $\text{score}(S_\text{in}, S_\text{out})=1-\text{SimilitudCoseno}(S_\text{in}, S_\text{out})$ mide la \textit{importancia} de una capa, entonces un criterio natural para realizar pruning es remover las capas con menor score.
+
+    Por ejemplo, se puede remover la mitad de las capas de atención en LLaMA 2 y perder solo un 2.4\% de rendimiento mientras que gana casi un 50\% de aceleración en inferencia.
+\end{frame}
+
+\begin{frame}{Pruning}
+    Se tienen 3 opciones naturales de pruning en un bloque Transformer:
+    \insertimage{pruning_1}{1}
+\end{frame}
+
+\begin{frame}{Pruning}
+    Ordenando todas las capas de un modelo Transformer por su score de importancia, se observa que:
+    \begin{itemize}
+        \item Muchas capas de atención tienen poca importancia. Más aún, eliminarlas no afecta significativamente el rendimiento.
+        \item También es posible eliminar algunas capas FF junto a las capas de atención para mejorar aún más la eficiencia.
+        \item Este patrón se observa a lo largo de todo el entrenamiento.
+    \end{itemize}
+    \insertimage{pruning_2}{1}
+\end{frame}
+
+\section{Fine tuning}
+
+\begin{frame}{Fine tuning}
+    Si bien la técnica de prompting es muy potente, algunas tareas aún requieren ajustar un poco más el modelo para lograr comportamientos más complejos o menos aleatorios.
+
+    Una forma de lograr esto es haciendo \textbf{fine tuning}, lo cual consiste en continuar el pre-entrenamiento del modelo utilizando un dataset específico para la tarea en la que se desea mejorar.
+
+    El fine tuning puede provocar una pérdida de rendimiento en otras tareas e incluso puede provocar que el LLM olvide información aprendida anteriormente (\textbf{catastrophic forgetting}).
+
+    Esto último puede ser aminorado agregando al fine tuning un poco de data usada durante el pre-entrenamiento.
+\end{frame}
+
+\begin{frame}{Instruction fine-tuning (SFT)}
+    Se puede hacer fine tuning utilizando datasets de instrucciones y respuestas siguiendo un \textbf{prompt template} de la forma
+    \begin{equation*}
+        \text{``Instrucción: <...>. Respuesta: <...>.''}
+    \end{equation*}
+    Una vez entrenado, este modelo se utiliza entregándole como input un prompt de la forma $\text{``Instrucción: <...>. Respuesta: ''}$.
+
+    También es posible obtener modelos conversacionales haciendo fine tuning con datasets de diálogos formateados con un chat template predefinido.
+
+    El chat template usado puede incluir estructuras adicionales como \text{system prompts}, \text{contextos} y uso de herramientas.
+\end{frame}
+
+\begin{frame}{LoRA}
+    Para hacer fine tuning, usualmente solo se actualizan los parámetros del cabezal de lenguaje y de las últimas capas del modelo.
+
+    Sin embargo, es posible actualizar todos los parámetros de forma eficiente utilizando técnicas como \textbf{Low-Rank Adaptation (LoRA)}.
+
+    Esta técnica permite hacer un fine tuning menos costoso sobre capas neuronales lineales (i.e., de la forma $x\mapsto Wx$), como las que se observan en los bloques MHSA y FF de un Transformer.
+
+    Más precisamente, LoRA reparametriza la actualización $\Delta W$ de la matriz de parámetros fine-tuneada, $\tilde W=W+\Delta W$, como el producto de dos matrices de menor tamaño. De este modo, solo se deben entrenar estas dos matrices pequeñas en lugar de la matriz completa $\Delta W$.
+\end{frame}
+
+\begin{frame}{LoRA}
+    Si $x\in\R^n \mapsto (W+\Delta W)x\in\R^m$ es la capa lineal fine-tuneada, con $W\in\mathcal{M}_{mn}(\R)$ la matriz de parámetros original y $\Delta W\in\mathcal{M}_{mn}(\R)$ el \textit{shift} que se aprende durante el fine tuning, LoRA propone reformular este shift como
+    \begin{equation*}
+        \Delta W=AB,
+    \end{equation*}
+    donde $A\in\mathcal{M}_{m\times r}(\R), B\in\mathcal{M}_{r\times n}(\R)$ son matrices entrenables. De este modo, ahora solo se tienen que ajustar $mr+rn$ parámetros en lugar de $mn$, por lo que si $r\ll\frac{mn}{m+n}$, la cantidad de parámetros a ajustar es mucho menor.
+
+    En consecuencia, LoRA sustituye la capa lineal original por un módulo de la forma
+    \begin{equation*}
+        x\mapsto  Wx + ABx,
+    \end{equation*}
+    donde la matriz $W$ está fija y solo se entrena $A$ y $B$.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item \textbf{Introducción a las GANs:} formulación, implementación, generación condicional.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 9: Modelos autorregresivos y LLMs (parte V)}
+\end{frame}
+
+\end{document}
