@@ -1,0 +1,140 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 10: Redes generativas adversarias (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Revisión Tarea 1}
+
+\section{Introducción a las GANs}
+
+\begin{frame}{Formulación}
+    Una red \textbf{generativa adversaria (GAN)} es una red bayesiana de variable latente, $p_\theta(x,z)=p(z)p_\theta(x|z)$ entrenada buscando \textit{engañar} a un clasificador binario $ q_\phi(y|x)$, el cual a su vez es entrenado para aprender a diferenciar muestras reales ($y=0$) de muestras generadas ($y=1$).
+
+    Una GAN considera las siguientes distribuciones:
+    \begin{itemize}
+        \item \textbf{Prior sobre el espacio latente:} $p(z)\sim\mathcal{N}{(0,\text{I}_L)}$.
+        \item \textbf{Generador:} $p_\theta(x|z)\sim\delta_{G_\theta(z)}(x)$ (i.e., es determinista: $z\mapsto G_\theta(x)$), donde $G_\theta:\R^L\to\R^D$ es una red neuronal.
+        \item \textbf{Discriminador:} $q_\phi(y|x)\sim\text{Bernoulli}(D_\phi(x))$, donde $D_\phi:\R^D\to[0,1]$ es una red neuronal.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Formulación}
+    El problema minimax asociado una GAN es el siguiente:
+    \begin{equation*}
+        \min_\theta \max_\phi
+        \mathcal{L}_\text{GAN}(\theta,\phi),
+    \end{equation*}
+    donde $\mathcal{L}_\text{GAN}(\theta,\phi)=\mathbb{E}_{(x,y)}\left[\log q_\phi(y|x)\right]$ es la log-verosimilitud esperada del discriminador sobre una distribución de datos de entrenamiento.
+
+    Además, dado que $ q_\phi(y|x)\sim\text{Bernoulli}(D_\phi(x))$, entonces:
+    \begin{equation*}
+        q_\phi(y|x)=
+        \begin{cases}
+            D_\phi(x)   & \text{si } y=1 \\
+            1-D_\phi(x) & \text{si }y=0
+        \end{cases}
+        =D_\phi(x)^y \left(1-D_\phi(x)\right)^{1-y},
+    \end{equation*}
+    por lo que la log-verosimilitud del discriminador es
+    \begin{equation*}
+        \log q_\phi(y|x)=y\log D_\phi(x)+(1-y)\log\left(1-D_\phi(x)\right)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Formulación}
+    Para entrenar una GAN, es necesario contar con imágenes reales ($y=1$) y con imágenes generadas ($y=0$). Es decir, una GAN se entrena considerando una distribución conjunta
+    \begin{equation*}
+        p(x,y) = \frac{1}{2}\left(p_\text{data}(x)\,\delta_1(y)+p_\theta(x)\,\delta_0(y)\right)
+    \end{equation*}
+    Por lo tanto:
+    \begin{align*}
+        \mathcal{L}_\text{GAN}(\theta,\phi)
+         & =\mathbb{E}_{(x,y)}\left[\log q_\phi(y|x)\right]\\
+         & =\frac{1}{2}\left(\mathbb{E}_{p_\text{data}(x)}\left[\log D_\phi(x)\right]
+        + \mathbb{E}_{p_\theta(x)}\left[\log (1-D_\phi(x))\right]\right)\\
+         & =\frac{1}{2}\left(\mathbb{E}_{p_\text{data}(x)}\left[\log D_\phi(x)\right]+\mathbb{E}_{p(z)}\left[\log (1-D_\phi\left(G_\theta(z))\right)\right]\right)
+    \end{align*}
+    donde se usó que $p_\theta(x|z)\sim\delta_{G_\theta(z)}(x)$ para $z\sim p(z)$.
+\end{frame}
+
+\begin{frame}{Formulación}
+    Para efectos de implementación, ambas esperanzas se estiman con aproximaciones de Monte Carlo:
+    \begin{itemize}
+        \item $\mathbb{E}_{p_\text{data}(x)}[\cdots]$ se aproxima usando un conjunto de entrenamiento i.i.d. $\mathcal{D}=\{x_1,\ldots,x_N\}\subset\R^D$ provenientes desde $p_\text{data}(x)$.
+        \item $\mathbb{E}_{p(z)}[\cdots]$ se aproxima usando muestras i.i.d. $\{z_1,\ldots,z_N\}\subset\R^L$ generadas desde $p(z)\sim\mathcal{N}(0,\text{I}_L)$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Generación condicional}
+    Se puede extender la formulación de una GAN para aprender distribuciones condicionales $p_\text{data}(x|c)$ mediante pares de entrenamiento de la forma $(x,c)\in\R^D\times\mathcal{C}$, donde $\mathcal{C}$ es el conjunto donde vive el factor condicionante del modelo. Por ejemplo:
+    \begin{itemize}
+        \item \textbf{Condicionamiento con etiquetas:} $c$ puede ser una etiqueta de clase. En este caso, se puede utilizar una matriz de embeddings para representar vectorialmente cada etiqueta.
+        \item \textbf{Condicionamiento con texto:} $c\in\mathcal{V}^*$ puede ser una secuencia de tokens. En este caso, se puede utilizar un modelo tipo BERT o CLIP para obtener una representación vectorial.
+        \item \textbf{Condicionamiento con imágenes:} si $c$ es una imagen, se puede utilizar un modelo tipo ViT (o tipo VAE, que se estudiará más adelante) para la representación vectorial.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Generación condicional}
+    En cualquiera de los casos, la red bayesiana de una \textbf{GAN condicional (CGAN)} es la siguiente:
+    \begin{equation*}
+        p_\theta(x,z|c)=p(z)p_\theta(x|c,z)
+    \end{equation*}
+    donde se ha asumido que $z\perp c$ ya que se sigue usando el prior gaussiano $p(z|c)\sim\mathcal{N}(0,\text{I}_L)$ para el espacio latente.
+
+    En este caso, ahora el generador es una red neuronal $G_\theta:\mathcal{C}\times\R^L\to\R^D$, mientras que el discriminador es una red neuronal $D_\phi:\mathcal{C}\times\R^D\to[0,1]$, ambos entrenados de forma adversativa usando la función de pérdida $\mathcal{L}_\text{CGAN}(\theta,\phi)$ definida como
+    \begin{equation*}
+        \mathbb{E}_{p(c)p_\text{data}(x|c)}\left[\log D_\phi(c,x)\right]+\mathbb{E}_{p(c)p(z)}\left[\log (1-D_\phi\left(c,G_\theta(c,z))\right)\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Redes convolucionales y convolución transpuesta.
+        \item Arquitectura U-Net.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 10: Redes generativas adversarias (parte I)}
+\end{frame}
+
+\end{document}
