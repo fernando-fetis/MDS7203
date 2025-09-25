@@ -1,0 +1,49 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº3}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Retrieval-augmented generation}
+\begin{enumerate}[{\bf P1.}]
+	\item Dado un conjunto de documentos, $M=(S_1,\ldots,S_N)\subset\mathcal{V}^*$ (interpretado como \textit{memoria externa}), explique cómo se realiza RAG usando estos documentos para responder una query $q\in\mathcal{V}^*$ realizada por un usuario a un LLM. Recuerde que para RAG es necesario utilizar un modelo de embedding $f:\mathcal{V}^*\to\R^d$ (p.g. BERT) que codifique secuencias de tokens en vectores de $\R^d$, y un modelo de lenguaje $g:\mathcal{V}^*\to\mathcal{V}^*$ (p.g. GPT) que genera texto a partir de un \textit{prompt} dado como entrada.
+\end{enumerate}
+
+\section*{Redes generativas adversarias}
+\begin{enumerate}[{\bf P1.}]
+	\item ¿Cuál es la función del generador y del discriminador en una GAN? ¿Por qué se dice que ambos modelos compiten entre sí?
+	\item Las GANs son modelos de variable latente (recordar que el generador es una red bayesiana $p_\theta(x,z)=p(z)p_\theta(x|z)$, con $p(z)\sim\mathcal{N}{(0,\text{I}_L)}$ y $p_\theta(x|z)\sim\delta_{G_\theta(z)}(x)$). Por qué esto no permite, en la práctica, entrenar una GAN usando el enfoque de máxima verosimilitud?
+\end{enumerate}
+
+
+
+\end{document}
