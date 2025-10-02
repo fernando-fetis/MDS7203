@@ -1,0 +1,157 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 14: Autoencoders variacionales (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Evidence lower bound}
+
+\begin{frame}{ELBO | Definición}
+    Un \textbf{VAE} es un modelo de variable latente $p_\theta(x,z)=p_\theta(z)p_\theta(x|z)$, el cual utiliza una segunda distribución auxiliar, $q_\phi(z|x)$ para aproximar la posterior intractable $p_\theta(z|x)$.
+
+    Un VAE se entrena maximizando la \textbf{ELBO} media sobre un conjunto de datos de entrenamiento, $\mathcal{D}=\{x^1,\ldots,x^N\}\subset\R^D$:
+    \begin{equation*}
+        \max_{\theta,\phi} \frac{1}{N}\sum_{n=1}^N \operatorname{ELBO}(x^n),
+    \end{equation*}
+    donde la ELBO (\textit{evidence lower bound}) de una muestra $x\in\R^D$ se define como
+    \begin{equation*}
+        \operatorname{ELBO}(x):=\log p_\theta(x)-\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z|x)\right)
+    \end{equation*}
+    Notar que $\operatorname{ELBO}(x)$ es una cota inferior de la \textbf{evidencia} $\log p_\theta(x)$.
+\end{frame}
+
+\begin{frame}{ELBO | Reformulación}
+    La ELBO se puede reescribir como:
+    \begin{equation*}
+        \operatorname{ELBO}(x) = \underbrace{\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]}_{\text{término de reconstrucción}} - \underbrace{\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)}_{\text{prior matching}}
+    \end{equation*}
+    Por lo tanto, conviene realizar la siguiente elección de distribuciones para hacer esta cantidad tratable:
+    \begin{itemize}
+        \item \textbf{Prior latente gaussiano:} $p_\theta(z) = p(z) = \mathcal{N}( 0, \operatorname{I}_L)$.
+        \item \textbf{Posterior aproximada gaussiana:} $q_\phi(z|x) = \mathcal{N}(\mu_\phi(x), \operatorname{diag}(\sigma^2_\phi(x)))$, donde $\mu_\phi:\R^D\to\R^L$ y $\sigma_\phi:\R^D\to\R^L_{++}$ son redes neuronales.
+        \item \textbf{Verosimilitud gaussiana (caso continuo):} $p_\theta(x|z) = \mathcal{N}(\mu_\theta(z), \sigma^2_0\operatorname{I}_D)$, donde $\mu_\theta:\R^L\to\R^D$ es una red neuronal y $\sigma^2_0>0$ es un un hiperparámetro fijo.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{ELBO | Prior matching}
+    Dadas dos distribuciones gaussianas en $\R^L$, su divergencia de Kullback-Leibler tiene forma cerrada:
+    \begin{align*}
+         & \operatorname{D_{KL}}\left(\mathcal{N}(\mu_1,\Sigma_1)\|\mathcal{N}(\mu_2,\Sigma_2)\right)                                                               \\
+         & = \frac{1}{2}\left[(\mu_1-\mu_2)^\top\Sigma_2^{-1}(\mu_1-\mu_2) + \operatorname{traza}(\Sigma_1\Sigma_2^{-1})-L-\log|\det(\Sigma_1\Sigma_2^{-1})|\right]
+    \end{align*}
+    Por lo tanto, considerando que $q_\phi(z|x)\sim\mathcal{N}\left(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))\right)$ y $p_\theta(z)\sim\mathcal{N}(0, \operatorname{I}_L)$, se tiene que
+    \begin{align*}
+         & \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)                                                               \\
+         & = \frac{1}{2}\left(\|\mu_\phi(x)\|^2 + \|\sigma_\phi(x)\|^2 \right) - \sum_{l=1}^L \log \sigma_\phi(x)_l + \text{constante}
+    \end{align*}
+\end{frame}
+
+\begin{frame}{ELBO | Término de reconstrucción}
+    Dado que $q_\phi(z|x)\sim\mathcal{N}\left(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))\right)$, esta v.a. se puede reparametrizar esta usando el cambio de variable
+    \begin{equation*}
+        z=\mu_\phi(x)+\sigma_\phi\odot \epsilon
+        \quad\text{donde}\quad
+        \epsilon\sim\mathcal{N}(0,\operatorname{I}_L)
+    \end{equation*}
+    Luego, el término de reconstrucción se puede escribir como
+    \begin{equation*}
+        \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] =
+        \mathbb{E}_{\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)}\left[\log p_\theta(x|\mu_\phi(x)+\sigma_\phi\odot \epsilon)\right]
+    \end{equation*}
+    Esta esperanza se puede aproximar usando Monte Carlo:
+    \begin{equation*}
+        \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] \approx \frac{1}{K} \sum_{k=1}^K \log p_\theta(x|\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon_k),
+    \end{equation*}
+    donde $\epsilon_k\sim\mathcal{N}(0,\operatorname{I}_L)$ para $k\in\{1,\ldots,K\}$.
+\end{frame}
+
+\begin{frame}{ELBO | Término de reconstrucción}
+    Dado que $p_\theta(x|z)\sim\mathcal{N}(\mu_\theta(z),\sigma_0^2\operatorname{I}_D)$:
+    \begin{equation*}
+        p_\theta(x|z)=\frac{1}{\sqrt{(2\pi\sigma_0^2)^D}}\exp\left(-\frac{1}{2\sigma_0^2}\|x-\mu_\theta(z)\|^2\right)
+    \end{equation*}
+    Por lo tanto, el término de reconstrucción se reduce a una diferencia de cuadrados, siendo similar a la función objetivo que se utiliza en un AE clásico:
+    \begin{equation*}
+        \log p_\theta(x|z)=-\frac{1}{2\sigma_0^2}\|x-\mu_\theta(z)\|^2 + \text{constante}
+    \end{equation*}
+\end{frame}
+
+\section{Reparametrization trick}
+
+\begin{frame}{Truco de la reparametrización}
+    El gradiente de una esperanza puede moverse dentro de la esperanza siempre y cuando la distribución con respecto a la que se calcula la esperanza no dependa de la variable con respecto a la que se está calculando el gradiente:
+    \begin{equation*}
+        \nabla_\theta\,\mathbb{E}_{p(x)}[f_\theta(x)]=\mathbb{E}_{p(x)}[\nabla_\theta f_\theta(x)]
+    \end{equation*}
+    Esta igualdad permite obtener estimadores insesgados del gradiente $\nabla_\theta f_\theta(x)$ usando una aproximación de Monte Carlo.
+
+    La igualdad anterior deja de ser cierta si $p(x)$ es una distribución que depende de $\theta$, por lo que no es posible usarla para estimar el gradiente del término de reconstrucción.
+\end{frame}
+
+\section{Interpolación en el espacio latente}
+
+\begin{frame}{Interpolación en el espacio latente}
+    Dadas dos muestras $x_0,x_1\in\R^D$, una forma trivial de interpolar entre ellas es mediante la interpolación euclidiana
+    \begin{equation*}
+        \tilde x_t =(1-t)x_0+tx_1,
+        \quad\text{donde}\quad
+        t\in[0,1]
+    \end{equation*}
+    Por lo general, esta interpolación genera muestras $\tilde x_t\in\R^D$ sin sentido cuando se busca interpretar a $\tilde x_t$ como una muestra proveniente de $p_\text{data}(x)$. Una interpolación en el espacio latente:
+    \begin{equation*}
+        z_t=(1-t)\operatorname{encoder}(x_0)+t\operatorname{encoder}(x_1)
+    \end{equation*}
+    De este modo, $x_t=\operatorname{decoder}(z_t)\in\R^D$ es una muestra interpolada linealmente pero en el espacio latente del VAE.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item VAEs para imágenes.
+        \item Algunas variantes de VAEs.
+        \item Manipulación de atributos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 14: Autoencoders variacionales (parte II)}
+\end{frame}
+
+\end{document}
