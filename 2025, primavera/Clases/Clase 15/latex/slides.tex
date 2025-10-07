@@ -1,0 +1,163 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 15: Autoencoders variacionales (parte III)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{VAEs para imágenes y generación condicional}
+
+\begin{frame}{Recuerdo VAE}
+    Un VAE necesita definir 3 distribuciones: un \textbf{encoder} $q_\phi(z|x)$, un \textbf{decoder} $p_\theta(x|z)$ y un \textbf{prior} $p(z)$.
+
+    Para el entrenamiento del encoder y del decoder se maximiza la \textbf{ELBO} esperada sobre un conjunto de datos de entrenamiento:
+    \begin{align*}
+        \operatorname{ELBO}(x):= & \log p_\theta(x)-\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z|x)\right)                                 \\
+        =                        & \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] - \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p(z)\right)
+    \end{align*}
+    Para la generación, se realiza \textbf{ancestral sampling}: primero se genera $z\sim p(z)$ y luego se genera $x\sim p_\theta(x|z)$.
+
+    Notar que el proceso de generación no hace uso del encoder.
+\end{frame}
+
+\begin{frame}{Elección de distribuciones}
+    El término de prior matching $\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p(z)\right)$ en la ELBO motiva a considerar distribuciones gaussianas para el prior latente y para el encoder:
+    \begin{itemize}
+        \item $p(z) \sim \mathcal{N}( 0, \operatorname{I}_L)$
+        \item $q_\phi(z|x) \sim \mathcal{N}(\mu_\phi(x), \operatorname{diag}(\sigma^2_\phi(x)))$
+    \end{itemize}
+    En cambio, la elección de la distribución $p_\theta(x|z)$ del encoder depende del tipo de datos que se esté modelando.
+
+    En particular, si los datos en $p_\text{data}(x)$ son de naturaleza continua, es usual considerar una \textbf{distribución gaussiana}:
+    \begin{equation*}
+        p_\theta(x|z) \sim \mathcal{N}(\mu_\theta(z), \sigma^2_0\operatorname{I}_D),
+    \end{equation*}
+    donde $\mu_\theta(z)\in\R^D$ es la salida de una red neuronal.
+\end{frame}
+
+\begin{frame}{Elección de distribuciones}
+    Si $p_\text{data}(x)$ es una distribución definida sobre imágenes, cada pixel $x_d\in[0,1]$ (condicionado a $z$) se suele modelar como una \textbf{distribución Bernoulli} con parámetro $r_d=r_\theta(z)_d\in[0,1]$:
+    \begin{equation*}
+        p_\theta(x_d|z)=r_d^{x_d}\cdot(1-r_d)^{1-x_d}
+    \end{equation*}
+    Luego, asumiendo una independencia condicional de los pixeles, la distribución asociada al decoder es
+    \begin{align*}
+        \log p_\theta(x|z)
+         & = \sum_{d=1}^D \log p_\theta(x_d|z)                                     \\
+         & = \sum_{d=1}^D \left(x_d\cdot\log r_d + (1-x_d)\cdot\log(1-r_d)\right),
+    \end{align*}
+    donde $r_\theta(z)=(r_1,\ldots,r_D)\in[0,1]^D$ es la salida de una red neuronal con activación sigmoidal.
+\end{frame}
+
+\begin{frame}{VAE condicional}
+    Al igual que toda red bayesiana, se puede extender la formulación original de un VAE a su \textbf{forma condicional}.
+
+    Si $y\sim p(y)$ es un factor condicionante (p.g. clase o descripción textual), entonces basta considerar las distribuciones condicionales
+    \begin{itemize}
+        \item \textbf{Encoder:} $q_\phi(z|x,y)$
+        \item \textbf{Decoder:} $p_\theta(x|z,y)$
+        \item \textbf{Prior:} $p(z|y)$.
+    \end{itemize}
+    Se suele considerar que $z\perp y$, por lo que $p(z|y)=p(z)$. En consecuencia, solo se deben modificar las redes neuronales asociadas al encoder y al decoder para que reciban la condición $y$ como entrada adicional.
+\end{frame}
+
+\section{Continuous Bernoulli}
+
+\begin{frame}{Función de densidad}
+    Si bien la formulación anterior es la más usada en VAEs para imágenes, es matemáticamente incorrecta ya que los pixeles están en el intervalo $[0,1]$ y no en el conjunto discreto $\{0,1\}$, por lo que no es correcto utilizar una distribución Bernoulli.
+
+    Para abordar este problema, se puede utilizar la distribución \textbf{Bernoulli continua}, la cual extiende el soporte de la distribución Bernoulli al intervalo $[0,1]$:
+    \begin{equation*}
+        x\sim\mathcal{CB}(r) \iff p(x) = C_r\, r^x(1-r)^{1-x}
+        \quad\text{para}\quad
+        r\in(0,1)
+    \end{equation*}
+    La constante de normalización $C_r=\int_0^1 r^x(1-r)^{1-x}\,\text{d}x\geq 2$ se puede obtener en forma cerrada.
+\end{frame}
+
+\begin{frame}{ELBO para Bernoulli continua}
+    Notar que $\log p_{CB}(x)=\log p_B(x)+\log C_r$, por lo que eligiendo $p_\theta(x|z)$ como un producto de Bernoulli’s continuas, se tiene que:
+    \begin{align*}
+        \text{ELBO}_{CB}(x)
+         & = \mathbb{E}_{q_\phi(z|x)}\left[\sum_{d=1}^D \log p_\theta(x_d|z)\right] - \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p(z)\right) \\
+         & =\text{ELBO}_B(x) + \mathbb{E}_{q_\phi(z|x)}\left[\sum_{d=1}^D\log C_{r_d}\right]
+    \end{align*}
+    En particular, dado que $C_{r_d}>1$, entonces $\text{ELBO}_{B}(x)<\text{ELBO}_{CB}(x)$. Es decir, usando continuous Bernoulli se obtiene una mejor cota inferior de la log-verosimilitud.
+\end{frame}
+
+\begin{frame}{Ejemplos}
+    Esta diferencia no es solo un error de formalidad, si no que induce errores significativos en la calidad de la generación:
+    \insertimage{continuous_bernoulli}{1}
+\end{frame}
+
+\section{Manipulación de atributos}
+
+\begin{frame}{Idea general}
+    La continuidad del espacio latente permite modificar la intensidad de algún atributo de una muestra:
+    \insertimage{attribute_modification}{1}
+\end{frame}
+
+\begin{frame}{Métodología}
+    Si $\mathcal{X}$ es un conjunto de muestras desde $p_\text{data}(x)$, $\mathcal{X}^+\subset\mathcal{X}$ es el subconjunto de muestras que poseen el atributo que se busca modificar y $\mathcal{X}^-\subset\mathcal{X}$ es el subconjunto de muestras que no poseen el atributo, entonces se pueden considerar los centroides
+    \begin{equation*}
+        z^+=\frac{1}{|\mathcal{X}^+|}\sum_{x\in\mathcal{X}^+} \text{encoder}(x),
+        \qquad
+        z^-=\frac{1}{|\mathcal{X}^-|}\sum_{x\in\mathcal{X}^-} \text{encoder}(x)
+    \end{equation*}
+    De este modo, el vector $z_{\text{atributo}}=z^+-z^-\in\R^L$ representa la \textbf{dirección latente} asociada al atributo. Luego, para $\lambda\in\R$ y para una muestra $x\sim p_\text{data}(x)$, la muestra
+    \begin{equation*}
+        \tilde x = \text{decoder}(\text{encoder}(x)+\lambda\, z_\text{atributo})
+    \end{equation*}
+    corresponde a la muestra original $x$ con el atributo amplificado ($\lambda>0)$ o disminuido ($\lambda<0$).
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item $\beta$-VAE y VQ-VAE.
+        \item Inception score (IS) y Fréchet inception distance (FID).
+        \item 4º control de lectura.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 15: Autoencoders variacionales (parte III)}
+\end{frame}
+
+\end{document}
