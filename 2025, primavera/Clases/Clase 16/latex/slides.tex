@@ -1,0 +1,160 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 16: Autoencoders variacionales (parte IV)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{$\beta$-VAE}
+
+\begin{frame}{Interpretación de la ELBO}
+    La ELBO de un VAE estándar es:
+    \begin{equation*}
+        \operatorname{ELBO}(x) = \underbrace{\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]}_{\text{término de reconstrucción}} - \underbrace{\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)}_{\text{prior matching}}
+    \end{equation*}
+
+    El \textbf{término de reconstrucción} fuerza a que el decoder aprenda a reconstruir bien los datos a partir de su representación latente dada por el encoder.
+
+    El \textbf{término de prior matching} fuerza a que la representación latente entregada por el encoder se parezca al prior $p_\theta(z)$, el cual se suele elegir como una distribución gaussiana isotrópica.
+    
+    En particular, el término de prior matching fuerza a que las dimensiones latentes sean independientes entre sí.
+\end{frame}
+
+\begin{frame}{Disentangled representations}
+    En \textbf{representation learning}, una representación latente se dice \textbf{desacoplada} si cada dimensión de la representación codifica una característica semántica distinta de los datos, la cual se mantiene invariante ante cambios en otros factores latentes.
+    
+    Una factorización latente desacoplada permite:
+    \begin{itemize}
+        \item Interpretar cada dimensión latente como una característica semántica de los datos.
+        \item Controlar las características semánticas de los datos manipulando las dimensiones latentes correspondientes.
+    \end{itemize}
+    Si bien se podrían buscar representaciones desacopladas usando aprendizaje supervisado, es deseable lograrlo usando únicamente aprendizaje no supervisado.
+\end{frame}
+
+\begin{frame}{Disentangled representations}
+    \insertimage{variation_factors}{1}
+\end{frame}
+
+\begin{frame}{Modificación de la ELBO}
+    Una forma de lograr representaciones desacopladas es usar un \textbf{$\beta$-VAE}, el cual le da más importancia al término de prior matching en la ELBO:
+    \begin{equation*}
+        \operatorname{ELBO}_\beta(x) = \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] - \beta\,\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right),
+    \end{equation*}
+    El hiperparámetro $\beta\ge 0$ controla el grado de disentanglement:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item Si $\beta=0$, se obtiene un autoencoder estándar sin regularización.
+        \item Si $\beta=1$, se recupera el VAE original.
+        \item Si $\beta>1$, se promueven representaciones latentes desacopladas.
+    \end{itemize}
+    El valor de $\beta$ induce un trade-off entre la calidad de generación y el grado de disentanglement de la representación latente.
+\end{frame}
+
+\begin{frame}{Ejemplo de juguete}
+    \insertimage{disentangled_figures}{1}
+\end{frame}
+
+\begin{frame}{Ejemplo en CelebA}
+    En datasets más complejos, las representaciones desacopladas aprendidas se corresponden con factores latentes naturales para un humano:
+    \insertimage{disentangled_celeba}{1}
+\end{frame}
+
+\section{VQ-VAE}
+
+\begin{frame}{Espacio latente discreto}
+    Los VAEs con decoders muy potentes sufren del \textbf{colapso de la posterior}, donde el decoder aprende $p_\text{data}(x)$ ignorando la representación latente $z\in\R^L$ dada (i.e., $q_\phi(z|x)\approx p(z)$).
+
+    Un \textbf{vector quantized VAE (VQ-VAE)} propone utilizar un espacio latente discreto formado por un conjunto finito de vectores, $\{e_k\}_{k=1}^K\subset\R^L$, los cuales son aprendidos durante el entrenamiento:
+
+    \begin{itemize}
+        \item El encoder $q_\phi(z|x)$ mapea de manera determinista cada dato $x\in\R^D$ a uno de los vectores en el \textbf{codebook} $\{e_1,\ldots,e_K\}\subset\R^L$.
+        \item El decoder procesa el vector latente $e_k\in\R^L$ igual que en un VAE estándar.
+        \item En una CNN, cada feature map (\textit{pixel}) en la salida del encoder se cuantiza de manera independiente, usando el mismo codebook.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Encoder determinista}
+    Para obtener el vector latente discreto asociado a una entrada, se sigue un enfoque tipo \textbf{$K$-means}, mapeando la salida de la red neuronal del encoder al vector más cercano en el codebook:
+    \begin{equation*}
+        q_\phi(z|x)\sim\delta_{e_k}(z),
+        \quad\text{donde}\quad
+        k = \argmin\limits_j \|z_e(x) - e_j\|
+    \end{equation*}
+    $z_e(x)$ es la salida continua de la red neuronal del encoder antes de la \textbf{cuantización}, la cual se denota como $z_q(x)=e_k$.
+    \insertimage{vq_vae}{0.9}
+\end{frame}
+
+\begin{frame}{Función de pérdida}
+    Un VQ-VAE considera una posterior $q_\phi(z|x)$ determinista, lo que evita el colapso de la posterior. Además, considerando un prior uniforme $p(z)\sim\text{Categórica}(\{e_1,\ldots,e_K\})$, el término de prior matching se vuelve constante.
+
+    La función de pérdida del VQ-VAE es:
+    \begin{equation*}
+        \mathcal{L}_\text{VQ-VAE}(x)
+        = \log p(x|z_q(x)) + \|\text{sg}[z_e(x)] - e\|^2 + \beta\,\|z_e(x) - \text{sg}[e]\|^2,
+    \end{equation*}
+    donde $z_e(x)$ es la salida del encoder, $z_q(x)$ es su representación cuantizada, $e$ es el codebook y $\text{sg}[\cdot]$ es la operación \textbf{stop-gradient}, que detiene el flujo de gradiente:
+    \begin{equation*}
+        \text{sg}[u] = u \text{ durante el forward}
+        \quad\text{y}\quad
+        \frac{\partial\, \text{sg}[u]}{\partial u} = 0 \text{ durante el backward}
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Función de pérdida}
+    Los nuevos términos en la función de pérdida son los siguientes:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item El término $\|\text{sg}[z_e(x)] - e\|^2$ (\textbf{VQ loss}) actualiza solo el codebook $e$, moviendo cada vector $e_k$ hacia los encodings $z_e$ que se le asignan (similar a k-means).
+        \item El término $\beta\,\|z_e(x) - \text{sg}[e]\|^2$ (\textbf{commitment loss}) actualiza solo el encoder, forzando a que sus encodings $z_e(x)$ se mantengan cerca de los vectores del codebook $e$ (evita que los encodings crezcan sin límite).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Introducción a normalizing flows.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 16: Autoencoders variacionales (parte IV)}
+\end{frame}
+
+\end{document}
