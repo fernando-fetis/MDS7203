@@ -1,0 +1,184 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 17: Flujos normalizantes (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Recuerdo de cosas previas}
+
+\begin{frame}{Teorema del cambio de variables en probabilidades}
+    Dada una variable aleatoria $X\sim p(x)$ en $\R$ y una función estrictamente creciente, $f:\R\to\R$, entonces se puede definir la variable aleatoria $Y=f(X)$, donde:
+    \begin{equation*}
+        F_Y(y)=\pr(Y\leq y)=\pr(f(X)\leq y)=\pr(X\leq f^{-1}(y))=F_X(f^{-1}(y))
+    \end{equation*}
+    derivando:
+    \begin{equation*}
+        F_Y'(y) = F_X'(f^{-1}(y))\left(f^{-1}\right)'(y)
+    \end{equation*}
+    Además, dado que $\left(f^{-1}\right)'=\frac{1}{f'\circ f^{-1}}$, se tiene que:
+    \begin{equation*}
+        p_Y(y) = p_X(f^{-1}(y))\cdot\frac{1}{f'(x)},
+        \quad\text{donde}\quad
+        x=f^{-1}(y)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Teorema del cambio de variables en probabilidades}
+    De forma análoga se puede hacer lo mismo para $f:\R\to\R$ decreciente.
+
+    En general, si $f:\R\to\R$ es biyectiva y diferenciable, entonces el \textbf{teorema de cambio de variable} entrega la densidad de $Y=f(X)$:
+    \begin{equation*}
+        p_Y(y) = p_X(f^{-1}(y))\left|\frac{1}{f'(x)}\right|,
+        \quad\text{donde}\quad
+        x=f^{-1}(y)
+    \end{equation*}
+    Este teorema puede ser extendido al caso multivariable, donde las variables aleatorias viven en $\R^D$. Para esto, es necesario recordar algunos conceptos de álgebra lineal y cálculo multivariable.
+\end{frame}
+
+\begin{frame}{Función inversa y determinante}
+    Dadas dos biyecciones $f,g:\R^D\to\R^D$, se tiene que:
+    \begin{itemize}
+        \item \textbf{Composición:} $g\circ f:\R^D\to\R^D$ es otra biyección.
+        \item \textbf{Inversa:} $(g\circ f)^{-1} = f^{-1}\circ g^{-1}$.
+    \end{itemize}
+    Dadas dos matrices cuadradas $A,B\in\mathcal{M}_{D,D}(\R)$, se cumple que:
+    \begin{itemize}
+        \item \textbf{Inversa:} $(AB)^{-1} = B^{-1}A^{-1}$
+        \item \textbf{Determinante:} $\det(AB) = \det(A)\det(B)$
+    \end{itemize}
+    Recordar que, para $A\in\mathcal{M}_{D,D}(\R)$, la cantidad $\det(A)\in\R$ mide el cambio de volumen que produce la transformación $f(x)=Ax$.
+\end{frame}
+
+\begin{frame}{Derivadas en cálculo multivariable}
+    Para un \textbf{campo vectorial} $f:\R^n\to\R^m$ existen $n\times m$ derivadas parciales, $\frac{\partial f_i}{\partial x_j}:\R\to\R$ asociadas a él. La \textbf{matriz jacobiana} de $f$, $J_f(x)\in\mathcal{M}_{m,n}(\R)$, almacena todas estas derivadas parciales:
+    \begin{equation*}
+        J_f(x) = \begin{pmatrix}
+            \frac{\partial f_1}{\partial x_1}(x) & \frac{\partial f_1}{\partial x_2}(x) & \cdots & \frac{\partial f_1}{\partial x_n}(x) \\
+            \frac{\partial f_2}{\partial x_1}(x) & \frac{\partial f_2}{\partial x_2}(x) & \cdots & \frac{\partial f_2}{\partial x_n}(x) \\
+            \vdots                               & \vdots                               & \ddots & \vdots                               \\
+            \frac{\partial f_m}{\partial x_1}(x) & \frac{\partial f_m}{\partial x_2}(x) & \cdots & \frac{\partial f_m}{\partial x_n}(x)
+        \end{pmatrix}
+        = \begin{pmatrix}
+            \nabla f_1(x)^\top \\
+            \nabla f_2(x)^\top \\
+            \vdots             \\
+            \nabla f_m(x)^\top
+        \end{pmatrix}
+    \end{equation*}
+    Además, la \textbf{regla de la cadena} se extiende naturalmente:
+    \begin{equation*}
+        J_{g\circ f}(x) = J_g(f(x))\,J_f(x)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Cambio de variables en varias variables}
+    Una función $f:\R^D\to\R^D$ es un \textbf{difeomorfismo} si es biyectiva, diferenciable y su inversa $f^{-1}$ también es diferenciable.
+
+    Si $X\sim p_X(x)$ es una variable aleatoria en $\R^D$ y $f:\R^D\to\R^D$ es un difeomorfismo, entonces $Y=f(X)$ tiene densidad
+    \begin{equation*}
+        p_Y(y) = p_X(f^{-1}(y))\left|\det J_{f^{-1}}(y)\right|
+    \end{equation*}
+    Además, por teorema de la función inversa:
+    \begin{equation*}
+        \det J_{f^{-1}}(y) = \frac{1}{\det J_f(x)},
+        \quad\text{donde}\quad
+        x = f^{-1}(y)
+    \end{equation*}
+\end{frame}
+
+\section{Flujos normalizantes}
+
+\begin{frame}{Formulación}
+    Dada una distribución base $p_z(z)$ y una distribución objetivo $p_\text{data}(x)$, el objetivo de la técnica de \textbf{flujos normalizantes}
+    es encontrar un difeomorfismo $f:\R^D\to\R^D$ tal que $x=f(z)$ tenga distribución $p_x(x)\approx p_\text{data}(x)$ cuando se comienza con $z\sim p_z(z)$.
+
+    Usualmente, $f$ se modela usando una red neuronal, la cual es entrenada usando el criterio de máxima verosimilitud, donde:
+    \begin{equation*}
+        \log p_x(x) = \log p_z(z) - \log\left|\det J_f(z)\right|,
+        \quad\text{con}\quad
+        z = f^{-1}(x)
+    \end{equation*}
+    Sin embargo, calcular $f^{-1}(x)$ y $\det J_f(z)$ de forma eficiente no es trivial si $f$ es una red neuronal arbitraria.
+\end{frame}
+
+\begin{frame}{Composición}
+    Una forma de facilitar el cálculo es definir $f:\R^D\to\R^D$ como la composición de varias transformaciones más simples:
+    \begin{equation*}
+        f(x) = \left(f_K\circ f_{K-1}\circ\cdots\circ f_1\right)(x)
+    \end{equation*}
+    Si cada $f_k:\R^D\to\R^D$ es un difeomorfismo, entonces $f$ también lo es. Además, $f^{-1}(x) = \left(f_1^{-1}\circ f_2^{-1}\circ\cdots\circ f_K^{-1}\right)(x)$.
+
+    Para $\log \left|\det J_f(z)\right|$ se tiene que:
+    \begin{equation*}
+        \det J_f(z) = \prod_{k=1}^{K}\det J_{f_k}(z_{k-1})
+    \end{equation*}
+    donde $z_0 = z$ y $z_k=f_k(z_{k-1})$. Por lo tanto:
+    \begin{equation*}
+        \log\left|\det J_f(z)\right| = \sum_{k=1}^K \log\left|\det J_{f_k}(z_{k-1})\right|
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    Dado un conjunto de entrenamiento $\mathcal{D}=\{x^n\}_{n=1}^N\subset\R^D$ de muestras generadas desde $p_\text{data}(x)$, se debe optimizar
+    \begin{equation*}
+        \max_\theta \frac{1}{N}\sum_{n=1}^N \log p_x(x^n)
+    \end{equation*}
+    donde cada término de la suma se calcula como
+    \begin{equation*}
+        \log p_x(x) = \log p_z(z_0) - \sum
+        _{k=1}^K \log\left|\det J_{f_k}(z_{k-1})\right|,
+    \end{equation*}
+    donde la suma se realiza comenzando desde $z_K=x$ y calculando hacia atrás $z_{k-1}=f_k^{-1}(z_k)$, hasta llegar a $z_0=f_1^{-1}(z_1)$.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Ejemplos de flujos normalizantes tratables.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 17: Flujos normalizantes (parte I)}
+\end{frame}
+
+\end{document}
