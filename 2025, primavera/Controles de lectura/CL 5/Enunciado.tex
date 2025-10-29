@@ -1,0 +1,48 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº5}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Flujos normalizantes}
+\begin{enumerate}[{\bf P1.}]
+	\item Los flujos normalizantes consisten en transformar una distribución de probabilidad simple $p(z)$ (p.g. gaussiana o uniforme) en una distribución más compleja, $p_\theta(x)$, que aproxime la distribución de los datos $p_\text{data}(x)$. Para esto, aprenden una función $f:\R^D\to\R^D$ de la forma $f = f_K\circ f_{K-1}\circ\cdots\circ f_1$, de modo que $x=f(z)$ es una muestra de $p_\theta(x)$ cuando $z\sim p(z)$. ¿Qué requisitos deben cumplir las funciones $f_k:\R^D\to\R^D$?
+	\item ¿Qué enfoque de entrenamiento se utiliza en los flujos normalizantes? Recordar que algunas opciones son máxima verosimilitud, entrenamiento adversarial, ELBO y divergencia de Fisher.
+\end{enumerate}
+
+\section*{Modelos basados en energía}
+\begin{enumerate}[{\bf P1.}]
+	\item Un EBM parametriza una distribución de probabilidad mediante $p_\theta(x)=\frac{\exp\left(-E_\theta(x)\right)}{Z_\theta}$, donde la función de energía $E_\theta:\R^D\to\R$ es una red neuronal y $Z_\theta=\int_{\R^D} \exp\left(-E_\theta(x)\right)\text{d}x$ es la constante de normalización. ¿Cómo es posible entrenar un EBM mediante máxima verosimilitud si $Z_\theta>0$ es intratable de calcular?
+	\item ¿Qué técnica de muestreo se utiliza para obtener muestras desde la distribución $p_\theta(x)$?
+\end{enumerate}
+
+\end{document}
