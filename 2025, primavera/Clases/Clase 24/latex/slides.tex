@@ -1,0 +1,166 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 24: Modelos de difusión (parte IV)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Adaptadores para DMs}
+
+\begin{frame}{Motivación}
+    \begin{itemize}
+        \item Modelos como Stable Diffusion pueden ser fine-tuned usando pares de entrenamiento $\text{(imagen,caption)}$.
+        \item Los DMs modernos son muy grandes, por lo que hacer fine tuning completo sobre estos modelos es costoso (e inlcuso prohibitivo) en tiempo, memoria y cómputo.
+        \item Un \textbf{adaptador} es un conjunto de parámetros adicionales que se añaden al modelo preentrenado y que se entrenan durante el fine-tuning, mientras que los parámetros originales del modelo permanecen fijos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Low-Rank Adaptation}
+    \begin{itemize}
+        \item Es usual utilizar \textbf{LoRA} con datasets pequeños ($\approx20$ imágenes) para adaptar el modelo a conceptos o estilos específicos.
+        \item Recordar que LoRA se aplica sobre \textbf{capas lineales}. En el caso de Stable Diffusion, es usual aplicar LoRA sobre las capas de atención y las capas convolucionales de la U-Net.
+        \item Esta técnica permite, al igual que en LLMs, reducir significativamente el costo de entrenamiento.
+        \item Además, al igual que en LLMs, se pueden combinar múltiples LoRAs en un mismo modelo para mezclar estilos o conceptos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{ControlNet}
+    Los modelos \textbf{text-to-image} están limitados en el control de detalles que tienen sobre la generación, incluso cuando se consideran técnicas de prompting o fine-tuning estándar.
+
+    Para ciertas tareas es deseable poder guiar la generación con información adicional, como bocetos, mapas de profundidad, mapas de segmentación, etc.
+    \insertimage{controlnet_examples}{0.8}
+\end{frame}
+
+\begin{frame}{ControlNet}
+    \textbf{ControlNet} es un adaptador construido sobre el encoder de la U-Net de Stable Diffusion, y permite inyectar información condicional en forma de imagen. En consecuencia, el modelo obtenido puede ser visto como un modelo \textbf{image-and-text-to-image}.
+
+    La idea es \textbf{clonar} ciertos bloques de la U-Net y usarlos para inyectar la imagen que se desea incluir como condición adicional. La salida de estos bloques se combinan con la salida de los bloques originales de la U-Net.
+
+    De este modo, los bloques clonados son fine-tuned para extraer la información relevante de la imagen condicional, mientras que los bloques originales permanecen fijos.
+\end{frame}
+
+\begin{frame}{ControlNet}
+    El adaptador se inyecta como lo indica el siguiente diagrama:
+    \insertimage{controlnet_adaptation}{0.6}
+    Es decir, si $f(x)$ es el bloque neuronal original (frozen) y $\tilde f(x)$ es una copia entrenable de $f(x)$, entonces
+    \begin{equation*}
+        y_c = f(x)+\text{ZeroConv}\left(\tilde f\left(x+\text{ZeroConv}(c)\right)\right)
+    \end{equation*}
+    $\text{ZeroConv}$ es un bloque convolucional con pesos y sesgo inicializados en 0. $c$ es la condición que se quiere inyectar al modelo.
+\end{frame}
+
+\begin{frame}{ControlNet}
+
+    \begin{columns}
+        \begin{column}{0.45\textwidth}
+            \insertimage{controlnet_unet}{1}
+        \end{column}
+        \begin{column}{0.55\textwidth}
+            \begin{itemize}
+                \item La imagen condicionante se debe pasar por una CNN reductora simple (recordar que Stable Diffusion usa un VAE).
+                \item Es usual omitir aleatoriamente el prompt durante el entrenamiento para forzar al modelo a aprender a usar la información de la imagen condicionante.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+
+\end{frame}
+
+\begin{frame}{ControlNet}
+    Durante el entrenamiento, la ControlNet suele aprender a utilizar la información de la condición de forma abrupta, no gradual (\textbf{sudden convergence phenomenon}).
+    \insertimage{controlnet_sudden_convergence}{0.9}
+\end{frame}
+
+\begin{frame}{ControlNet}
+    Es posible combinar varias ControlNet’s en un mismo modelo. Para esto basta combinar las salidas de las distintas ControlNet’s en una sola salida que se inyecta en la U-Net original.
+    \insertimage{controlnet_merge}{0.9}
+\end{frame}
+
+\begin{frame}{Textual Inversion}
+    Otra posible tarea que se puede realizar con DMs es la de aprender nuevos conceptos de manera precisa a partir de pocos ejemplos (5-10 imágenes).
+
+    Se podría intentar hacer fine-tuning estándar. Este enfoque suele provocar \textbf{catastrophic forgetting}. Además, no necesariamente se aprende bien el concepto que se busca enseñar.
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \insertimage{ti_input}{1}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \insertimage{ti_output}{1}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Textual Inversion}
+    \textbf{Textual Inversion} inyecta un concepto ampliando el \textbf{vocabulario} del text-encoder. Así, el nuevo concepto se representa como un nuevo embedding en el espacio latente del text-encoder.
+    \insertimage{ti_embedding}{0.7}
+    Este nuevo vector de embedding se entrena y los pesos del text-encoder y del modelo de difusión permanecen fijos.
+\end{frame}
+
+\begin{frame}{Textual Inversion}
+    La nueva \textit{palabra} aprendida puede ser utilizada directamente en prompts en lenguaje natural como si fuese una palabra real.
+    \insertimage{ti_samples}{0.8}
+    Esto es esperable si se considera que los espacios latentes de los LLMs suelen ser semánticamente significativos.
+\end{frame}
+
+\begin{frame}{DreamBooth}
+    Textual Inversion solo actualiza el embedding del nuevo concepto pero deja fijo el resto del modelo, no permitiéndole ajustar sus parámetros para representar mejor el nuevo concepto.
+
+    \textbf{DreamBooth} relaja esto y realiza fine-tuning sobre todo el modelo. Más aún, DreamBooth quita la complejidad de aprender un nuevo vector de embedding y en su lugar utiliza un \textbf{token especial} que se añade al vocabulario del text-encoder.
+    \insertimage{dreambooth_example1}{0.7}
+\end{frame}
+
+\begin{frame}{DreamBooth}
+    Está técnica permite utilizar muy pocas imágenes (3-5) para aprender de forma robusta el nuevo concepto.
+    \insertimage{dreambooth_example2}{1}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Repaso de EDO.
+        \item Introducción a flow matching.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 24: Modelos de difusión (parte IV)}
+\end{frame}
+
+\end{document}
