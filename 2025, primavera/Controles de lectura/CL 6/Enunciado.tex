@@ -1,0 +1,47 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº6}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Modelos de difusión}
+\begin{enumerate}[{\bf P1.}]
+	\item Un modelo de difusión estándar debe aprender la media $\mu_q(x_0,x_t,t)\in\R^D$ de la distribución condicional $q(x_{t-1}|x_t,x_0)\sim\mathcal{N}(\mu_q(x_0,x_t,t),\sigma_q^2(t)\operatorname{I}_D)$ usando una red neuronal $\mu_\theta(x_t,t)$ entrenada para maximizar la ELBO. Luego, utiliza esta cantidad aprendida para realizar las transiciones $p_\theta(x_{t-1}|x_t)\sim\mathcal{N}\left(\mu_\theta(x_t,t),\sigma_q^2(t)\operatorname{I}_D\right)$ del proceso de denoising.
+	
+	Sin embargo, es posible reparametrizar la red neuronal $\mu_\theta(x_t,t)$ para que aprenda otras cantidades relacionadas con $\mu_q(x_0,x_t,t)$. Mencione 3 reparametrizaciones posibles.
+
+	\item ¿Cómo se utiliza la reparametrización score-prediction en la técnica de classifier guidance? ¿Qué ventaja tiene classifier-free guidance sobre la técnica original de classifier guidance?
+	
+	\item ¿Cómo funciona el mecanismo de atención cruzada que utiliza Stable Diffusion para condicionar el proceso de generación con un prompt de texto? ¿Quién actúa como query, key y value en este mecanismo?
+\end{enumerate}
+
+\end{document}
