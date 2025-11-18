@@ -1,0 +1,152 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 25: Modelos a tiempo continuo (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Repaso de EDO}
+
+\begin{frame}{Problema de Cauchy}
+    Dada una función $f:\R^D\times[0,1]\to\R^D$, una \textbf{EDO} es una ecuación de la forma $\frac{\text{d}}{\text{d}t}x(t)=f(x(t),t)$, cuyas soluciones $x:[0,1]\to\R^D$ suelen estar determinadas por una condición de valor inicial $x(0)=x_0$, formando lo que se conoce como un \textbf{problema de Cauchy}:
+    \begin{equation*}
+        \begin{cases}
+\dot x_t=f\left(x_t,t\right)\\
+x_0=x_0
+\end{cases}
+    \end{equation*}
+    Bajo ciertas hipótesis razonables, esta EDO tiene solución única. Más aún, las trayectorias que se siguen al comenzar desde distintos puntos iniciales no se cruzan.
+\end{frame}
+
+\begin{frame}{Algoritmo de Euler}
+    La notación $\text{d}x_t=f(x_t,t)\,\text{d}t$ motiva un método natural para aproximar la solución de una EDO numéricamente.
+
+    Si $\Delta t>0$ es un tamaño de discretización y $\Delta x_t=x_{t+\Delta t}-x_t$, entonces, el \textbf{algoritmo de Euler} calcula iterativamente
+    \begin{equation*}
+        x_{t+\Delta t}=x_t+f(x_t,t)\,\Delta t,
+\quad t\in\{0,\Delta t,2\Delta t,\ldots,1\}
+    \end{equation*}
+\end{frame}
+
+
+\section{Ecuación de continuidad}
+
+
+\begin{frame}{Ley de conservación de masa}
+
+    Interpretando la EDO $\frac{\text{d}}{\text{d}t}x(t)=f(x,t)$ como una partícula que comienza en $x_0\in\R^D$ y continúa su trayectoria siguiendo un campo de velocidades $f(x,t)$,  es posible plantar otra ecuación diferencial que indique la evolución de la \textbf{densidad de masa} en el espacio a medida que va pasando el tiempo.
+
+    Esta ecuación diferencial será necesaria para la formulación del paradigma de flow matching.
+    
+\end{frame}
+
+\begin{frame}{Derivación de la ecuación de continuidad}
+    Dado un fluido en $\R^D$ inmerso en un campo de velocidades $v:\R^D\times[0,T]\to\R^D$, su densidad de masa $\rho:\R^D\times[0,T]\to\R_+$ depende del tiempo debido a los cambios de densidad local.
+    
+    Para un instante de tiempo fijo $t\in[0,T]$, la masa total dentro de un volumen $\Omega\subset\R^D$ viene dada por $\int_\Omega \rho_t(x)\,\text{d}x$. Luego, por conservación de masa:
+    \begin{equation*}
+        \frac{\partial}{\partial t}\left(\int_\Omega \rho_t(x)\,\text{d}x\right)=-\oint_{\partial\Omega}\rho_t(x)v_t(x)\,\text{d}S = -\int_\Omega \text{div}(\rho_t v_t)(x)\,\text{d}x
+    \end{equation*}
+    donde en la segunda igualdad se utilizó el \textbf{teorema de la divergencia de Gauss}.
+\end{frame}
+
+\begin{frame}{Derivación de la ecuación de continuidad}
+    En consecuencia:
+    \begin{equation*}
+        \int_\Omega \left(\partial_t \rho_t(x)-\text{div}(\rho_t v_t)(x)\right)\,\text{d}x=0
+    \end{equation*}
+    Dado que esto se tiene que cumplir para cualquier volumen $\Omega\subset\R^D$, necesariamente el integrando debe ser nulo, es decir:
+\begin{equation*}
+\partial_t \rho_t(x)=\text{div}(\rho_t v_t)(x)
+\end{equation*}
+
+Esta ecuación es conocida como \textbf{ecuación de continuidad} (o ecuación de transporte), y codifica la restricción de conservación de masa que debe seguir un fluido a medida que se desplaza a lo largo de un campo de velocidades $v(x,t)$.
+
+\end{frame}
+
+\begin{frame}{Ecuación de continuidad}
+
+    La ecuación de continuidad será útil en flow matching para codificar la restricción de conservación de la masa de probabilidad $x_t\sim p_t(x)$ a medida que se transforma $x_0\sim p_0(x_0)$ en $x_1\sim p_1(x_1)\approx p_\text{data}(x_1)$ siguiendo un campo de velocidades aprendido por una red neuronal.
+
+Más adelante, esta ecuación será extendida a su versión estocástica, llamada ecuación de Fokker-Planck, la cual permitirá, entre otras cosas, obtener la ecuación diferencial estocástica asociada al proceso de denoising de un modelo de difusión.
+
+\end{frame}
+
+\section{Introducción a flow matching}
+
+\begin{frame}{Motivación}
+    El método de \textbf{flow matching} propone transportar una distribución $p_0(x)$ (p.g. gaussiana) a otra distribución $p_1(x)$ que sea similar a $p_\text{data}(x)$.
+    
+    Para esto, plantea el problema de aprender el \textbf{campo de velocidades} $\tilde u_t:\R^D\times[0,1]\to\R^D$ que deben seguir las muestras iniciales $x_0\sim p_0(x_0)$ para transformarse en muestras $x_1\sim p_1(x_1)$ de la distribución desconocida $p_\text{data}(x)$. 
+    \insertimage{fm}{0.5}
+\end{frame}
+
+\begin{frame}{Motivación}
+    Para esto, se puede plantear la EDO asociada a este problema,
+    \begin{equation*}
+        \begin{cases}
+\dot x_t=\tilde u(x_t,t)\\
+x_0\sim p_\text{prior}(x_0)
+\end{cases},
+    \end{equation*}
+    donde $\tilde u:\R^D\times[0,1]\to\R^D$ es un campo de velocidades (desconocido) tal que $x_1\sim p_1(x_1)=p_\text{data}(x_1)$ cuando se comienza desde $x_0\sim p_0(x_0)= p_\text{prior}(x_0)$ y se sigue el campo de velocidades dado por $\tilde u$.
+
+    Para aprender $\tilde u(x_t,t)\in\R^D$, se entrena una red neuronal $u^\theta:\R^D\times[0,1]\to\R^D$ usando la función de costo
+    \begin{equation*}
+        L_\text{FM}(\theta)
+=\mathbb{E}_{t\sim \text{Uniforme}([0,T]),x_t\sim p_t(x_t)}\left[\left\|u_t^\theta(x_t)-\tilde u_t(x_t)\right\|^2\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Flow matching (continuación).
+        \item Stable Diffusion 3 y FLUX.
+        \item Uso de GPU en la nube.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 25: Modelos a tiempo continuo (parte I)}
+\end{frame}
+
+\end{document}
