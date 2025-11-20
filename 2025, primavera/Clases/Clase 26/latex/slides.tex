@@ -1,0 +1,218 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 26: Modelos a tiempo continuo (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Recuerdo clase anterior}
+
+\begin{frame}{Ecuación de continuidad}
+    Dado un \textbf{fluido} con densidad de masa $\rho:\R^D\times[0,T]\to\R_+$, el cual se transporta siguiendo un campo de velocidades $v:\R^D\times[0,T]\to\R^D$, la \textbf{ley de conservación de masa} puede ser codificada mediante la \textbf{ecuación de continuidad}:
+    \begin{equation*}
+        \partial_t \rho_t(x)=-\text{div}(\rho_t v_t)(x)
+    \end{equation*}
+    Esta ecuación se puede entender desde una perspectiva probabilística, donde $\rho_t$ es la densidad de probabilidad de una variable aleatoria $x_t\sim p_t(x_t)$ que evoluciona en el tiempo siguiendo el campo de velocidades $v_t$.
+\end{frame}
+
+\begin{frame}{Idea general de flow matching}
+    \textbf{Flow matching} busca \textit{transportar} muestras de una distribución inicial $p_\text{prior}(x)$ (p.g. gaussiana) hacia muestras de una distribución final, $p_\text{data}(x)$. Este \textbf{transporte} puede ser modelado como aprender un campo de velocidades $\tilde u(x,t)$ tal que las soluciones del problema de Cauchy
+    \begin{equation*}
+        \begin{cases}
+            \dot x_t=\tilde u(x_t,t) \\
+            x_0\sim p_\text{prior}(x_0)
+        \end{cases},
+    \end{equation*}
+    sean tales que $x_1\sim p_1(x_1)=p_\text{data}(x_1)$ cuando se comienza desde una muestra inicial $x_0\sim p_0(x_0)= p_\text{prior}(x_0)$ y se sigue el campo de velocidades $\tilde u$.
+\end{frame}
+
+\begin{frame}{Idea general}
+    \insertimage{fm}{1}
+\end{frame}
+
+\section{Flow matching}
+
+\begin{frame}{Función objetivo}
+    Para aprender el campo de velocidades desconocido, $\tilde u(x_t,t)\in\R^D$, se entrenará una red neuronal $u^\theta:\R^D\times[0,1]\to\R^D$ para que aprenda esta cantidad. La función de costo natural para este problema es
+    \begin{equation*}
+        L_\text{FM}(\theta)
+        =\mathbb{E}_{t\sim \text{Uniforme}([0,T]),x_t\sim p_t(x_t)}\left[\left\|u_t^\theta(x_t)-\tilde u_t(x_t)\right\|^2\right],
+    \end{equation*}
+    la cual no es computable ya que no se conoce la distribución $p_t(x_t|x_0)$ ni el campo de velocidades $\tilde u_t(x_t)$.
+
+    Se trabajará esta expresión para llegar a una expresión equivalente fácil de evaluar para poder entrenar eficientemente la red neuronal $u_t^\theta$.
+\end{frame}
+
+\begin{frame}{Generación}
+    Teniendo la red entrenada (i.e., con $u_t^\theta(x_t)\approx \tilde u_t(x_t)$), es posible generar nuevas muestras comenzando desde $x_0\sim p_\text{prior}(x_0)$ y luego simulando la EDO
+    \begin{equation*}
+        \begin{cases}
+            \dot x_t=u_t^\theta(x_t) \\
+            x_0=x_0
+        \end{cases}
+    \end{equation*}
+    hasta llegar a $x_1\sim p_1(x_1)\approx p_\text{data}(x_1)$. Para la simulación, se puede utilizar el algoritmo de Euler:
+    \begin{equation*}
+        x_{t+\Delta t}=x_t+u_t^\theta(x_t)\,\Delta t,
+        \quad t\in\{0,\Delta t,2\Delta t,\ldots,1\}
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Generación}
+    \insertimage{sampling}{0.8}
+\end{frame}
+
+\begin{frame}{Simplificación del problema}
+    El campo de velocidades objetivo, $\tilde u:\R^D\times[0,1]\to\R^D$, y las trayectorias de probabilidad $p_t(x_t)$ son desconocidos. Es posible descomponer el problema de aprender el campo de velocidades $\tilde u_t$ por una versión más simple:
+    \begin{itemize}
+        \item Se fija una muestra $x_1\sim p_\text{data}(x_1)$.
+        \item Para esta muestra fija, se propone el problema de aprender un campo de velocidades condicional $\tilde u_t(x_t|x_1)$ que transporte todos los elementos $x_0\sim p_\text{prior}(x_0)$ al punto $x_1\in\R^D$.
+        \item Este transporte condicional ocurre siguiendo trayectorias de probabilidad condicional $p_t(x_t|x_1)$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Simplificación del problema}
+    \insertimage{conditional_transport}{0.8}
+\end{frame}
+
+\begin{frame}{Simplificación del problema}
+    En este nuevo problema, la distribución de llegada es determinista ya que concentra toda su masa en un único punto $x_1\in\R^D$.
+
+    Este simple cambio permite encontrar fácilmente trayectorias de probabilidad condicional $p_t(x_t|x_1)$ (con su respectivo campo de velocidades $\tilde u_t(x_t|x_1)\in\R^D$) que cumplan las condiciones de transporte deseadas:
+    \begin{itemize}
+        \item $p_0(x_0|x_1)\sim p_\text{prior}(x_0)$
+        \item $p_0(x_1|x_1)\sim \delta(x_1)$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Trayectorias condicionales gaussianas}
+    Considerando $p_\text{prior}(x_0)\sim\mathcal{N}(0,\text{I}_D)$, una forma directa de lograr el objetivo es considerar las siguientes trayectorias gaussianas:
+    \begin{equation*}
+        p_t(x_t|x_1)\sim\mathcal{N}(\alpha_t x_1,\beta_t^2\text{I}_D),
+    \end{equation*}
+    donde $\left(\alpha_t\right)_{t\in[0,1]}\subset \R$ y $\left(\beta_t\right)_{t\in[0,1]}\subset \R_+$ son secuencias creciente y decreciente respectivamente, con $\alpha_0=\beta_1=0$ y $\alpha_1=\beta_0=1$.
+
+    Notar que los modelos de difusión tienen tienen las mismas marginales $p_t(x_t|x_1)$ (con el tiempo invertido) cuando se consideran las opciones \textit{más simples}:
+    \begin{equation*}
+        \alpha_t=t
+        \quad\text{y}\quad
+        \beta_t=1-t.
+    \end{equation*}
+    Esta suele ser la elección típica, y resulta coincidir con la formulación del paradigma de \textbf{rectified flow}.
+\end{frame}
+
+\begin{frame}{Trayectorias condicionales gaussianas}
+    Al considerar $p_t(x_t|x_1)\sim\mathcal{N}(\alpha_t x_1,\beta_t^2\text{I}_D)$, las trayectorias condicionales son completamente conocidas:
+    \begin{equation*}
+        x_t=\alpha_t x_1+\beta_t x_0
+        \quad\text{con}\quad
+        x_0\sim p_\text{prior}(x_0)
+    \end{equation*}
+    Más aún, es directo obtener el campo de velocidades condicional $\tilde u_t(x_t|x_1)\in\R^D$ asociado a estas trayectorias:
+    \begin{align*}
+        \tilde u_t(x_t|x_1) & =\dot x_t                                                                                          \\
+                            & = \dot \alpha_t x_1+\dot\beta_t x_0                                                                \\
+                            & =\dot \alpha_t x_1+\dot\beta_t \left(\frac{x_t-\alpha_tx_1}{\beta_t}\right)                        \\
+                            & = \left(\dot\alpha_t-\frac{\dot \beta_t}{\beta_t}\alpha_t\right)x_1+\frac{\dot\beta_t}{\beta_t}x_t
+    \end{align*}
+\end{frame}
+
+\begin{frame}{Función objetivo tratable}
+    Teniendo la distribución condicional $p_t(x_t|x_1)$ es directo obtener la distribución $p_t(x_t)=\int_\R^D p_t(x_t|x_1)p_\text{data}(x_1)\text{d}x_1$ necesaria en $L_\text{FM}(\theta)$. Sin embargo, sigue siendo necesario obtener el campo de velocidades incondicional, $\tilde u_t(x_t)$.
+
+    El campo $\tilde u_t(x_t)$ puede ser obtenido a partir del campo $\tilde u_t(x_t|x_1)$. Para esto, se usarán las ecuaciones de continuidad.
+    \begin{itemize}
+        \item Ecuación asociada a $\tilde u_t(x_t)$:
+              \begin{equation*}
+                  \partial_t p_t(x_t)=-\text{div}\left(p_t \tilde u_t\right)(x_t)
+              \end{equation*}
+        \item Ecuación asociada a $\tilde u_t(x_t|x_1)$:
+              \begin{equation*}
+                  \partial_t p_t(x_t|x_1)=-\text{div}\left(p_t(\cdot|x_1)\tilde u_t(\cdot|x_1)\right)(x_t)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Función objetivo tratable}
+    Desarrollando la ecuación de continuidad incondicional:
+    \begin{equation*}
+        \partial_t p_t(x_t)
+        =-\text{div}\left(p_t(\cdot)\int_{\R^D} \tilde u_t(\cdot|x_1)p_t(x_1|\cdot)\,\text{d}x_1\right)(x_t)
+    \end{equation*}
+    En consecuencia, se identifica que:
+    \begin{align*}
+        \tilde u_t(x_t) & =\int_{\R^D} \tilde u_t(x_t|x_1)p_t(x_1|x_t)\,\text{d}x_1    \\
+                        & =\mathbb{E}_{p_t(x_1|x_t)}\left[ \tilde u_t(x_t|x_1)\right],
+    \end{align*}
+    por lo que es posible expresar el campo vectorial desconocido, $\tilde u_t(x_t)$, en función del campo condicional conocido, $\tilde u_t(x_t|x_1)$.
+\end{frame}
+
+\begin{frame}{Función objetivo final}
+    Se puede sustituir la expresión anterior en $L_\text{FM}(\theta)$ para llegar a una cantidad tratable:
+    \begin{align*}
+        L_\text{FM}(\theta)
+         & =\mathbb{E}_{t,p_t(x_t)}\left[\left\|u_t^\theta(x_t)-\tilde u_t(x_t)\right\|^2\right]                                       \\
+         & =\mathbb{E}_{t,p_\text{data}(x_1),p_t(x_t|x_1)}\left[\left\|u_t^\theta(x_t)-\tilde u_t(x_t|x_1)\right\|^2\right]+\text{cte} \\
+    \end{align*}
+    En particular, usando $\tilde u_t(x_t|x_1)= \left(\dot\alpha_t-\frac{\dot \beta_t}{\beta_t}\alpha_t\right)x_1+\frac{\dot\beta_t}{\beta_t}x_t$ asociado a $p_t(x_t|x_1)\sim\mathcal{N}(\alpha_t x_1,\beta_t^2\text{I}_D)$, se llega a la función objetivo usual,
+    \begin{equation*}
+        \mathbb{E}_{t,p_\text{data}(x_1),\epsilon\sim\mathcal{N}(0,\text{I}_D)}\left[\left\|u_t^\theta\left(tx_1+(1-t)\epsilon\right)-(x_1-\epsilon)\right\|^2\right]+\text{cte},
+    \end{equation*}
+    donde se sustituyó $\alpha_t=t$ y $\beta_t=1-t$.
+\end{frame}
+
+\section{Algunos modelos de flow matching}
+
+\section{Uso de GPU en la nube}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Conceptos de cálculo estocástico.
+        \item Modelos de difusión a tiempo continuo.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 26: Modelos a tiempo continuo (parte II)}
+\end{frame}
+
+\end{document}
