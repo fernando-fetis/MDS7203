@@ -1,0 +1,49 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº7}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Adaptadores}
+\begin{enumerate}[{\bf P1.}]
+	\item ControlNet es una técnica que permite condicionar modelos de difusión preentrenados con información adicional. Mencione 3 tipos de condicionamiento que se pueden realizar utilizando ControlNet para guiar la generación de imágenes.
+	\item DreamBooth es una técnica de fine tuning que permite personalizar modelos de difusión para generar imágenes de un sujeto o concepto específico (\textit{subject-driven generation}). Explique cómo se realiza el fine tuning y la generación de imágenes personalizadas utilizando DreamBooth.
+\end{enumerate}
+
+\section*{Flow matching}
+\begin{enumerate}[{\bf P1.}]
+	\item ¿Qué cantidades relaciona la ecuación de continuidad? ¿Cuál es su importancia en el contexto de flow matching?
+	\item En flow matching, se aprende un campo vectorial $u_t(x)$ que define una ODE de la forma $\dot x_t = u_t(x_t)$. Explique cómo se utiliza esta ODE para generar nuevas muestras utilizando un modelo ya entrenado.
+	\item Mencione 3 diferencias entre los modelos de difusión y los modelos de flow matching.
+\end{enumerate}
+
+\end{document}

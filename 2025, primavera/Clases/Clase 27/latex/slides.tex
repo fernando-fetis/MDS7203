@@ -1,0 +1,199 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 27: Modelos a tiempo continuo (parte III)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Primavera, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Conceptos de cálculo estocástico}
+
+\begin{frame}{Movimiento browniano}
+    Un movimiento browniano es un proceso estocástico $(w_t)_{t\in[0,1]}$ con las siguientes propiedades:
+    \begin{itemize}
+        \item \textbf{Inicio determinista:} $w_0\sim\delta_0(w_0)$. Es decir, $w_0=0$.
+        \item \textbf{Incrementos gaussianos:} dados dos instantes de tiempo $t_1< t_2$, entonces $w_{t_2}-w_{t_1}\sim\mathcal{N}(0,(t_2-t_1)\text{I}_D)$.
+        \item \textbf{Incrementos independientes:} dados los instantes de tiempo $t_1< t_2<t_3<t_4$, entonces, $(w_{t_4}-w_{t_3})\perp (w_{t_2}-w_{t_1})$.
+        \item \textbf{Trayectorias continuas:} el mapa $t\in[0,1]\mapsto x_t\in\R^D$ es continuo.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Movimiento browniano}
+    La definición de movimiento browniano nos da un método para simularlo.
+
+    Si $\Delta t>0$ es un tamaño de discretización, entonces $\mathcal{N}(0,\Delta t\,\text{I}_D)$, por lo que basta comenzar en $w_0=0$ y luego ir actualizando el proceso generando incrementos aleatorios:
+    \begin{equation*}
+        w_{t+\Delta t}=w_t+\sqrt{\Delta t}\,\epsilon_t,
+        \quad \epsilon_t\sim\mathcal{N}(0,\text{I}_D)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{SDEs}
+    Una \textbf{ecuación diferencial ordinaria (ODE)} de la forma
+    \begin{equation*}
+        \text{d}x_t = f(x_t,t)\,\text{d}t
+    \end{equation*}
+    se puede interpretar como la evolución de una partícula bajo la influencia de un campo de velocidades, $f(x_t,t)$. Este tipo de dinámicas se observa, por ejemplo, en flow matching.
+
+    Una \textbf{ecuación diferencial estocástica (SDE)} permite agregar un término de ruido a la dinámica de evolución, el cual es modelado usando un movimiento browniano:
+    \begin{equation*}
+        \text{d}x_t = f(x_t,t)\,\text{d}t + g(t)\,\text{d}w_t
+    \end{equation*}
+    El término $f(x_t,t)$ se conoce como \textbf{drift} y el término $g(t)$ como \textbf{difusión}.
+\end{frame}
+
+\begin{frame}{Algoritmo de Euler-Maruyama}
+    Las soluciones de una SDE $\text{d}x_t = f(x_t,t)\,\text{d}t + g(t)\,\text{d}w_t$ son procesos estocásticos $(x_t)_{t>0}$.
+
+    De forma similar a las ODEs, estos procesos pueden ser simulados numéricamente. En particular, se puede adaptar el algoritmo de Euler para ODEs al caso estocástico, obteniendo el \textbf{algoritmo de Euler-Maruyama}:
+    \begin{equation*}
+        x_{t+\Delta t} = x_t + f(x_t,t)\,\Delta t + g(t)\sqrt{\Delta t}\,\epsilon_t,
+        \quad \epsilon_t\sim\mathcal{N}(0,\text{I}_D)
+    \end{equation*}
+    sujetos a alguna condición o distribución inicial, $x_0\sim p_0(x_0)$.
+\end{frame}
+
+\begin{frame}{Ecuación de Fokker-Planck}
+    Como motivación, se puede considerar un movimiento browniano estándar unidimensional ($D=1$), cuya SDE viene dada por
+    \begin{equation*}
+        \begin{cases}
+            \text{d}x_t=\text{d}w_t \\
+            x_0=0
+        \end{cases}
+    \end{equation*}
+    En este caso, para todo $t>0$, $p_t(x_t)\sim\mathcal{N}(0,t)$:
+    \begin{equation*}
+        p(x,t)=\frac{1}{\sqrt{2\pi t}}\exp\left(-\frac{x^2}{2t}\right),
+    \end{equation*}
+    Se puede verificar directamente que este conjunto de densidades marginales cumple la \textbf{ecuación del calor}:
+    \begin{equation*}
+        \partial_t\,p(x,t) = \frac{1}{2}\partial^2_{xx}\, p(x,t),
+        \quad\forall x\in\R^D,\,t\in[0,1].
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Ecuación de Fokker-Planck}
+    Este resultado puede ser extendido para $D>1$, donde $\partial^2_{xx}\, p(x,t)$ es sustituido por $\Delta p(x,t):=\sum_{d=1}^D\partial^2_{dd}\, p(x,t)$.
+
+    Más aún, es posible extender el resultado anterior a SDEs más generales:
+
+    Dada la SDE $\text{d}x_t=f_t(x_t)\,\text{d}t+g_t\,\text{d}w_t$, entonces, $x_t\sim p_t(x_t)$ para todo $t\in[0,1]$ si y solo si se cumple la \textbf{ecuación de Fokker-Planck}
+    \begin{equation*}
+        \partial_t p_t(x)=-\text{div}(p_tf_t)(x)+\frac{g_t^2}{2}\Delta p_t(x),
+        \quad\forall x\in\R^D,t\in[0,1]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Dinámica de Langevin}
+    Si $\pi$ es una función de densidad en $\R^D$, la \textbf{dinámica de Langevin}
+    \begin{equation*}
+        d x_t = \frac{1}{2}\nabla_{x_t} \log \pi(x_t) dt + d w_t
+    \end{equation*}
+    tiene distribución invariante $\pi$. Es decir, $p_t(x_t)\to\pi(x_t)$ cuando $t\to\infty$.
+    En particular, el \textbf{algoritmo de Langevin sampling} usado en los EBMs, que es solo una discretización de Euler-Maruyama de la dinámica de Langevin para $\pi=p_\theta$, converge a $p_\theta$.
+\end{frame}
+
+\section{DMs a tiempo continuo}
+
+\begin{frame}{Idea general}
+    El objetivo de los \textbf{modelos de difusión a tiempo continuo} es definir una SDE como proceso de difusión hacia adelante que transforme los datos en ruido, y luego aprender una SDE hacia atrás que permita recuperar los datos desde el ruido.
+    \insertimage{sde_trajectories}{1}
+\end{frame}
+
+\begin{frame}{Teorema de Anderson}
+    Dada la SDE
+    \begin{equation*}
+        \begin{cases}
+            \text{d}x_t = f(x_t,t)\,\text{d}t + g(t)\,\text{d}w_t, \\
+            x_0\sim p_0(x_0)
+        \end{cases}
+    \end{equation*}
+    entonces la siguiente SDE, definida hacia atrás en el tiempo, tiene las mismas distribuciones marginales $p_t(x_t)$ que el proceso original:
+    \begin{equation*}
+        \begin{cases}
+            \text{d}x_t = \left[f(x_t,t) - g(t)^2 \nabla_{x_t} \log p_t(x_t)\right]\,\text{d}t + g(t)\,\text{d}\bar{w}_t, \\
+            x_T\sim p_T(x_T)
+        \end{cases}
+    \end{equation*}
+    En particular, la única cantidad desconocida en la SDE hacia atrás es el score $\nabla_{x_t} \log p_t(x_t)$.
+\end{frame}
+
+\begin{frame}{Formulación}
+    Utilizando el resultado anterior, un DM a tiempo continuo utiliza el siguiente par de SDEs forward-backward:
+    \begin{equation*}
+        \begin{cases}
+            \text{d}x_t = f(x_t,t)\,\text{d}t + g(t)\,\text{d}w_t,                                                        & x_0\sim p_{\text{data}}(x_0) \\
+            \text{d}x_t = \left[f(x_t,t) - g(t)^2 \nabla_{x_t} \log p_t(x_t)\right]\,\text{d}t + g(t)\,\text{d}\bar{w}_t, & x_T\sim p_\text{prior}(x_T),
+        \end{cases}
+    \end{equation*}
+    donde los términos $f(x_t,t)$ y $g(t)$ son predefinidos de tal forma que $p_T(x_T)\approx p_\text{prior}(x_T)$, con $p_\text{prior}$ una distribución simple (p.g., gaussiana).
+
+    La cantidad desconocida, $\nabla_{x_t} \log p_t(x_t)$, es aproximada por una red neuronal entrenada mediante \textbf{score matching}.
+\end{frame}
+
+\begin{frame}{DSM en DMs a tiempo continuo}
+    La función objetivo natural para un DM a tiempo continuo es una versión continua de DSM:
+    \begin{equation*}
+        \mathbb{E}_{t\sim\text{Uniforme}(0,T)}\left[\lambda(t)\,\mathbb{E}_{x_t\sim p_t(x_t)}\left[\left\|\nabla_{x_t} \log p_t(x_t) - s_\theta(x_t,t)\right\|_2^2\right]\right]
+    \end{equation*}
+
+    Donde el objetivo cuadrático puede ser transformado para obtener una forma tratable:
+    \begin{equation*}
+        \hspace{-0.9cm}
+        \mathbb{E}_{t\sim\text{Uniforme}(0,T)}\left[\lambda(t)\,\mathbb{E}_{x_0\sim p_{\text{data}}(x_0),x_t\sim p_{t|0}(x_t|x_0)}\left[\left\|\nabla_{x_t} \log p_{t|0}(x_t|x_0) - s_\theta(x_t,t)\right\|_2^2\right]\right]
+    \end{equation*}
+    donde $p_{t|0}(x_t|x_0)$ es la distribución condicional definida por la SDE forward, la cual es conocida en ciertos casos.
+\end{frame}
+
+\begin{frame}{Probability flow ODE}
+    Para una SDE forward $\text{d}x_t = f(x_t,t)\,\text{d}t + g(t)\,\text{d}w_t$, es posible definir una ODE llamada \textbf{probability flow ODE},
+    \begin{equation*}
+        \text{d}x_t = \left[f(x_t,t) - \frac{1}{2}g(t)^2 \nabla_{x_t} \log p_t(x_t)\right]\,\text{d}t
+    \end{equation*}
+    la cual tiene las mismas distribuciones marginales $p_t(x_t)$ que la SDE forward. Notar que, al igual que en la SDE backward, la única cantidad desconocida es el score $\nabla_{x_t} \log p_t(x_t)$.
+
+    Esto permite poder utilizar solvers eficientes de ODEs para la generacion. Además, permite conectar los DMs a tiempo continuo con modelos flow-based a tiempo continuo.
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 27: Modelos a tiempo continuo (parte III)}
+\end{frame}
+
+\end{document}
