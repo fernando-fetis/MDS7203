@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Archivos ocultos del proyecto
+.hidden/
+
+# LaTeX
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Clases y tareas
+*.pt
+*.pth
+# *.pdf
+# *.txt
+# *.csv
+# *.json
+# *.npy

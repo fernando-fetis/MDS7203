@@ -1,0 +1,26 @@
+numpy
+scipy
+pandas
+
+torch
+torchvision
+torchsummary
+
+transformers
+accelerate
+tiktoken
+huggingface_hub
+einops
+
+diffusers
+
+matplotlib
+Pillow
+
+tqdm
+h5py
+gdown
+requests
+
+# music21
+# pymupdf
