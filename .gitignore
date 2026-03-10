@@ -3,8 +3,10 @@
 
 # Archivos ocultos del proyecto
 .hidden/
+.vscode/
 
 # LaTeX
+.aux/
 *.aux
 *.fdb_latexmk
 *.fls
