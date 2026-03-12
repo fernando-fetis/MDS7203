@@ -4,6 +4,7 @@
 # Archivos ocultos del proyecto
 .hidden/
 .vscode/
+.venv
 
 # LaTeX
 .aux/
@@ -24,6 +25,7 @@ __pycache__/
 
 # Jupyter
 .ipynb_checkpoints/
+data/
 
 # Clases y tareas
 *.pt
