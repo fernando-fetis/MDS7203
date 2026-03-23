@@ -1,0 +1,223 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 4: Redes bayesianas (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Modelos de variable latente}
+
+\begin{frame}{Definición}
+    \begin{itemize}
+        \item Al proponer redes bayesianas para modelar distribuciones es usual asumir la existencia de \textbf{variables ocultas} cuyo valor no se conoce. Estos modelos se llaman \textbf{modelos de variable latente}.
+        \item Los modelos de variable latente son redes bayesianas de la forma $p(x,z)=p(z)p(x|z)$, donde se supone que la variable latente $z$ produce la \textit{esencia} subyacente de los datos y $x$ es la representación observada de $z$.
+        \item \textbf{Hipótesis de la variedad:} propone que, si bien los datos observados viven en un espacio ambiente de alta dimensión, $\R^D$, realmente provienen de un espacio de menor dimensión, $\R^L$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Propiedades del espacio latente}
+    Se puede usar la regla de Bayes para obtener la posterior $p(z|x)$ de un modelo de variable latente $p(x,z)=p(z)p(x|z)$. Esto permite obtener una \textbf{representación latente}, $z\in\R^L$, de los datos observados, $x\in\R^D$. En particular:
+    \begin{itemize}
+        \item \textbf{Reducción de dimensionalidad:} se tiene una forma de representar datos de alta dimensión en un espacio de menor dimensión, logrando propiedades de compresión.
+        \item \textbf{Espacio latente interpretable:} muchas veces, el espacio latente de la red bayesiana tiene buenas propiedades de interpretabilidad, lo que permite manipular los datos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Aritmética en el espacio latente}
+    Obtener representaciones latentes de muestras observadas permite lo siguiente:
+    \begin{itemize}
+        \item \textbf{Interpolación semántica:} si $x_0,x_1\in\R^D$ son dos muestras y $z_0,z_1\in\R^L$ son sus representaciones latentes, se puede considerar la interpolación latente $z_t=tz_1+(1-t)z_0$ para luego generar una muestra interpolada desde $p(x|z_t)$.
+        \item \textbf{Manipulación de atributos:} si $\{z^+_1,\ldots,z^+_n\}$ son latentes de muestras con un atributo positivo y $\{z^-_1,\ldots,z^-_m\}$ son latentes de muestras con un atributo negativo, se puede considerar el vector director $r=\frac{1}{n}\sum_{i=1}^n z^+_i-\frac{1}{m}\sum_{j=1}^m z^-_j$ para trasladar la latente de una muestra en la dirección de $r$, logrango aumentar o disminuir la presencia de dicho atributo en la muestra.
+    \end{itemize}
+\end{frame}
+
+\section{Inferencia en redes bayesianas}
+
+\begin{frame}{Inferencia}
+    La \textbf{inferencia bayesiana} consiste en obtener conclusiones sobre una distribución a partir de un conjunto de muestras observadas. Se considerarán dos tipos de inferencia sobre una red bayesiana $p(x_1,\ldots,x_N)=\prod_{n=1}^N p(x_n|\operatorname{Pa}(x_n))$ genérica:
+    \begin{itemize}
+        \item \textbf{Inferencia sobre variables no observadas:} estimar el valor de una variable a partir de otras variables observadas.
+        \item \textbf{Inferencia sobre los parámetros:} estimar los parámetros de alguna de la distribuciones $p(x_n|\text{Pa}(x_n))$ de la red bayesiana.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Inferencia sobre variables no observadas}
+    Para un modelo de variable latente $p(x,z)=p(z)p(x|z)$, se puede hacer inferencia bayesiana sobre la variable latente $z$ si se conoce el valor de la variable observable $x$. Para esto, se puede obtener la \textbf{distribución posterior} $p(z|x)$ usando la regla de Bayes:
+    \begin{equation*}
+        p(z|x) = \frac{p(x|z)p(z)}{p(x)}
+    \end{equation*}
+    Notar que la distribución marginal $p(x)=\int_{\R^L}p(x,z) \,\text{d}z$ es costosa de obtener ya que requiere integrar sobre todos los posibles valores de la variable latente $z\in\R^L$.
+\end{frame}
+
+\begin{frame}{Estimación de parámetros}
+    Dada una red bayesiana $p(x_1,\ldots,x_N)=\prod_{n=1}^N p(x_n|\operatorname{Pa}(x_n))$ (p.g. un LLM o un modelo de difusión), la tarea más frecuente en IA generativa consiste en estimar los parámetros de las distribuciones de la red bayesiana, para luego poder generar nuevas muestras utilizando las distribuciones aprendidas.
+    \begin{itemize}
+        \item $\theta_n$ representará los \textbf{parámetros desconocidos} de $p(x_n|\operatorname{Pa}(x_n))$.
+        \item $\theta=\{\theta_1,\ldots,\theta_N\}$ representará el conjunto de todos los parámetros desconocidos de la red bayesiana.
+        \item Por simplicidad, usualmente se asumirá que $\theta$ es un vector.
+        \item La tarea de \textbf{estimación de parámetros} consiste en estimar el vector de parámetros $\theta$ a partir de un conjunto de observaciones $\mathcal{D}=\{x^1,\ldots,x^K\}$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Estimación de parámetros}
+    Dada una red bayesiana $p(x_1,\ldots,x_N)=\prod_{n=1}^N p(x_n|\operatorname{Pa}(x_n))$, se puede considerar cada parámetro desconocido, $\theta_n$, como una \textbf{variable aleatoria adicional} cuyo valor es desconocido. De esta forma, la nueva red bayesiana es:
+    \begin{equation*}
+        p(x,\theta)=p(\theta)p(x|\theta)=p(\theta)\prod_{n=1}^N
+        p(x_n|\operatorname{Pa}(x_n),\theta_n)
+    \end{equation*}
+    Con esto, es posible hacer inferencia sobre estas nuevas variables para obtener los parámetros desconocidos de la red bayesiana original.
+\end{frame}
+
+\begin{frame}{Criterio de máximo a posteriori}
+    Para realizar inferencia sobre los parámetros desconocidos de una red bayesiana, $\theta=\{\theta_1,\ldots,\theta_N\}$, se puede usar el criterio de \textbf{máximo a posteriori}, el cual consiste en elegir los \textit{parámetros más probables} luego de ver las muestras $\mathcal{D}=\{x^1,\ldots,x^K\}$:
+    \begin{align*}
+        \hat\theta_{\text{MAP}}  := & \argmax_\theta p(\theta|\mathcal{D})          \\
+        =                           & \argmax_\theta p(\mathcal{D}|\theta)p(\theta)
+    \end{align*}
+    La distribución $p(\theta)$ es un \textbf{prior} sobre los parámetros, mientras que $p(\mathcal{D}|\theta)$ es la \textbf{verosimilitud de los parámetros}, la cual representa la probabilidad de generar los datos observados al considerar los parámetros $\theta$.
+\end{frame}
+
+\begin{frame}{Criterio de máximo a posteriori}
+    Dado que $x\mapsto \log(x)$ es estrictamente creciente, se prefiere maximizar $\log p(\theta|\mathcal{D})=\log p(\mathcal{D}|\theta)+\log p(\theta)$ ya que:
+    \begin{itemize}
+        \item La log-verosimilitud es más fácil de manipular ya que convierte productos en sumas.
+        \item La log-verosimilitud es numéricamente más estable ya que evita problemas de underflow (la transformación \textit{estira} el intervalo de probabilidades $(0,1]$ al intervalo no acotado $(-\infty,0]$).
+    \end{itemize}
+    Por otro lado, de aquí en adelante se usará la notación $p_\theta(x):=p(x|\theta)$. Si una distribución no lleva parámetro como subíndice, se asumirá que se conocen sus parámetros (i.e., son distribuciones fijas).
+\end{frame}
+
+\begin{frame}{Criterio de máxima verosimilitud}
+    \begin{itemize}
+        \item Utilizar un \textbf{prior gaussiano}, $p(\theta)\sim\mathcal{N}(0,\frac{1}{\lambda}\text{I}_P)$, equivale a utilizar regularización $l^2$ sobre los parámetros:
+              \begin{equation*}
+                  \log p(\theta|\mathcal{D})=\log p_\theta(\mathcal{D}) - \frac{\lambda}{2}\|\theta\|^2 + \text{constante}
+              \end{equation*}
+        \item Utilizar un \textbf{prior uniforme}, $p(\theta)\propto 1$, equivale a la \textbf{estimación de máxima verosimilitud}:
+              \begin{equation*}
+                  \hat\theta_\text{MLE}:=\argmax_\theta \log p_\theta(\mathcal{D})
+              \end{equation*}
+    \end{itemize}
+    En ambos casos, si las muestras son i.i.d.s (i.e., si $x^i\perp x^j|\theta$, para todo $x^i, x^i\in\mathcal{D}$), la log-verosimilitud se puede escribir como:
+    \begin{equation*}
+        \log p_\theta(\mathcal{D})
+        =\log \prod_{k=1}^K p_\theta(x^k)
+        =\sum_{k=1}^K \log p_\theta(x^k)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Criterio de máxima verosimilitud}
+    En algunos casos simples se puede obtener el MLE en forma cerrada:
+    \begin{itemize}
+        \item Si $\mathcal{D}=\{x^1,\ldots,x^K\}\subset\R$, se puede considerar $p_\theta(x)\sim\mathcal{N}(\mu,\sigma^2)$, con parámetro $\mu\in\R$ desconocido y $\sigma^2>0$ conocido. En este caso:
+              \begin{equation*}
+                  \hat\mu_\text{MLE}=\frac{1}{K}\sum_{k=1}^K x^k
+              \end{equation*}
+        \item Si $\mathcal{D}=\{x^1,\ldots,x^K\}\subset\{0,1\}$ son muestras binarias, se puede considerar $p_\theta(x)\sim\text{Bernoulli}(r)$, con $r\in[0,1]$ un parámetro desconocido. En este caso:
+              \begin{equation*}
+                  \hat r_\text{MLE}=\frac{1}{K}\sum_{k=1}^K x^k
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Criterio de máxima verosimilitud}
+    En modelos más complejos la solución no se puede conocer de forma cerrada, por lo que hay que recurrir a \textbf{algoritmos de optimización}. Lo usual en IA generativa es estimar los parámetros desconocidos con una \textbf{red neuronal} entrenada para maximizar la log-verosimilitud sobre $\mathcal{D}=\{x^1,\ldots,x^K\}$.
+
+    \textbf{Ejemplo:} si $p_\theta(x,z)=p_\theta(z)p(x|z)$ es una mixtura gaussiana con $p_\theta(z)\sim\text{Ber}(r)$, $p(x|z=0)\sim\mathcal{N}(\mu_0,\sigma_0^2)$, $p(x|z=1)\sim\mathcal{N}(\mu_1,\sigma_1^2)$:
+    \begin{equation*}
+        p_\theta(x)=\frac{1-r}{\sqrt{2\pi\sigma_0^2}}\exp\left(-\frac{(x-\mu_0)^2}{2\sigma_0^2}\right) + \frac{r}{\sqrt{2\pi\sigma_1^2}}\exp\left(-\frac{(x-\mu_1)^2}{2\sigma_1^2}\right)
+    \end{equation*}
+    Se puede estimar el valor de $r\in[0,1]$ usando una red neuronal que maximice $ \log p_\theta(\mathcal{D})=\sum_{k=1}^K \log p_\theta(x^k)$.
+\end{frame}
+
+\begin{frame}{Verosimilitud en modelos de variable latente}
+    En modelos de variable latente es usual no poder maximizar la verosimilitud de forma cerrada. Más aún, esta cantidad muchas veces ni siquiera es tratable.
+
+    En efecto, para una red bayesiana $p_\theta(x,z)=p_\theta(x|z)p_\theta(z)$, la verosimilitud se obtiene por marginalización:
+    \begin{equation*}
+        p_\theta(x)=\int_{\R^L} p_\theta(x,z)\,\text{d}z
+        =\int_{\R^L} p_\theta(z)p_\theta(x|z)\,\text{d}z
+    \end{equation*}
+
+    Esta cantidad es intratable cuando $z$ es de muy alta dimensión o cuando evaluar las distribuciones es muy costoso.
+
+    En consecuencia, este tipo de modelos suele utilizar otra función de costo para el entrenamiento.
+\end{frame}
+
+\begin{frame}{Relación con teoría de la información}
+    La función de información de Shannon (para $b>1$ fijo) de un evento $A$ se define como:
+    \begin{equation*}
+        \text{I}(A):=-\log_b \text{Prob}(A)
+    \end{equation*}
+    La entropía de una distribución de probabilidad $p(x)$ se define como la información media de dicha distribución:
+    \begin{equation*}
+        \text{H}(p) := \mathbb{E}_{p(x)}\left[\text{I}(x)\right]=\mathbb{E}_{p(x)}\left[-\log p(x)\right]
+    \end{equation*}
+    Con esto, la entropía cruzada entre dos distribuciones de probabilidad $p(x)$ y $q(x)$ se define como la información media de $p$ medida con la información de $q$:
+    \begin{equation*}
+        \text{CE}(p,q) :=\mathbb{E}_{p(x)}\left[-\log q(x)\right]= -\int_{\R^D}\log q(x)\,p(x)\,\text{d}x
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Relación con teoría de la información}
+    Se tiene la siguiente relación entre ambos conceptos:
+    \begin{equation*}
+        \text{CE}(p,q) = \text{H}(p)+\operatorname{D_{KL}}(p\|q),
+    \end{equation*}
+    donde $\operatorname{D_{KL}}(p\|q)$ es la divergencia de Kullback-Leibler:
+    \begin{equation*}
+        \operatorname{D_{KL}}(p\|q)
+        :=\mathbb{E}_{p(x)}\left[\log\left(\frac{p(x)}{q(x)}\right)\right]= \int_{\R^D} \log\left(\frac{p(x)}{q(x)}\right)p(x)\,\text{d}x
+    \end{equation*}
+    Estos conceptos permiten relacionar la función de costo de máxima verosimilitud con la entropía cruzada y la divergencia de Kullback-Leibler:
+    \begin{equation*}
+        \argmax_{\theta} \log p_\theta(\mathcal{D})
+        =\argmin_\theta \text{CE}\left(p_{\mathcal{D}},p_\theta\right)
+        = \argmin_\theta \operatorname{D}_{KL}\left(p_{\mathcal{D}}\|p_\theta\right)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Introducción a los modelos autorregresivos.
+        \item Generación de texto usando una RNN.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 4: Redes bayesianas (parte II)}
+\end{frame}
+
+\end{document}
