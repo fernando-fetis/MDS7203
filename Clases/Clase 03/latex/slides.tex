@@ -1,0 +1,273 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 3: Redes bayesianas (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Introducción a las redes bayesianas}
+
+\begin{frame}{Introducción}
+    \begin{itemize}
+        \item Toda la información acerca de cómo se relacionan las distintas variables aleatorias dentro de un modelo probabilístico está contenida en su \textbf{distribución conjunta} $p(x_1,\ldots,x_N)$.
+        \item Muchas veces los modelos suelen incluir \textbf{hipótesis de independencia} entre ellas para hacer más simple el modelo.
+        \item Esto regulariza el modelo y permite disminuir la cantidad de parámetros necesarios para definir la distribución conjunta.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo inicial}
+    \vspace{0.3cm}
+    \begin{columns}
+        \begin{column}{0.7\textwidth}
+            Se tienen 4 variables aleatorias binarias:
+            \begin{itemize}
+                \item \textbf{Variable aleatoria $x_1$}: el estudiante estudia para el examen.
+                \item \textbf{Variable aleatoria $x_2$}: el estudiante responde bien las preguntas teóricas.
+                \item \textbf{Variable aleatoria $x_3$}: el estudiante responde bien las preguntas prácticas.
+                \item \textbf{Variable aleatoria $x_4$}: el estudiante aprueba el curso.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.3\textwidth}
+            \insertimage{ejemplo}{1.0}
+        \end{column}
+    \end{columns}
+    Se considera $x_i\sim\text{Bernoulli}(r_i)$ para $i\in\{1,2,3,4\}$, y se asocia la respuesta “sí” al valor 1 y la respuesta “no” al valor 0.
+    \begin{equation*}
+         p(x_1,x_2,x_3,x_4)=p(x_1)p(x_2|x_1)p(x_3|x_1)p(x_4|x_2,x_3)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Ejemplo inicial}
+    \begin{columns}[T]
+        \begin{column}{0.52\textwidth}
+            \begin{itemize}
+                \item Probabilidad de que el estudiante responda bien las preguntas teóricas.
+                \item Probabilidad de que el estudiante haya estudiado si no respondió bien las preguntas teóricas.
+                \item Probabilidad de que responda bien tanto las preguntas teóricas como las preguntas prácticas.
+                \item Probabilidad de que responda bien las preguntas prácticas si respondió bien las preguntas teóricas.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.52\textwidth}
+            \scriptsize
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{|c|c|}
+                    \hline
+                    $p(x_1 = 0)$ & $p(x_1 = 1)$ \\
+                    \hline
+                    0.10         & 0.90         \\
+                    \hline
+                \end{tabular}
+            \end{table}
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{|c|c|c|}
+                    \hline
+                    $x_1$ & $p(x_2 = 0|x_1)$ & $p(x_2 = 1|x_1)$ \\
+                    \hline
+                    0     & 0.80             & 0.20             \\
+                    1     & 0.25             & 0.75             \\
+                    \hline
+                \end{tabular}
+            \end{table}
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{|c|c|c|}
+                    \hline
+                    $x_1$ & $p(x_3 = 0|x_1)$ & $p(x_3 = 1|x_1)$ \\
+                    \hline
+                    0     & 0.70             & 0.30             \\
+                    1     & 0.20             & 0.80             \\
+                    \hline
+                \end{tabular}
+            \end{table}
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{|c|c|c|c|}
+                    \hline
+                    $x_2$ & $x_3$ & $p(x_4 = 0|x_2, x_3)$ & $p(x_4 = 1|x_2, x_3)$ \\
+                    \hline
+                    0     & 0     & 0.95                  & 0.05                  \\
+                    1     & 0     & 0.35                  & 0.65                  \\
+                    0     & 1     & 0.40                  & 0.60                  \\
+                    1     & 1     & 0.01                  & 0.99                  \\
+                    \hline
+                \end{tabular}
+            \end{table}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Formulación}
+    Se requieren los siguientes conceptos de teoría de grafos:
+    \begin{itemize}
+        \item \textbf{Grafo dirigido:} estructura compuesta por un conjunto de nodos $V$ y por un conjunto de arcos $E\subset V\times V$.
+        \item \textbf{Arco dirigido:} se usa $(u,v)\in E$ para indicar que el grafo posee un arco dirigido desde el nodo $u\in V$ hacia el nodo $v\in V$.
+        \item \textbf{Camino dirigido:} secuencia de nodos que sigue el \textbf{orden topológico} del grafo.
+        \item \textbf{Grafo dirigido acíclico (DAG):} grafo dirigido donde no existen caminos dirigidos que empiecen y terminen en un mismo nodo.
+        \item \textbf{Nodos padres:} para cada nodo $v\in V$, el conjunto de sus nodos padres es $\operatorname{Pa}(v):=\{u\in V:(u,v)\in E\}$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Formulación}
+    La idea general de una \textbf{red bayesiana} es poder representar una distribución conjunta $p(x_1,\ldots,x_N)$ como un DAG $(V,E)$.
+    \begin{itemize}
+        \item Aquí, $V=\{x_1,\ldots,x_N\}$, mientras que $(x_i,x_j)\in E$ indica que la variable $x_i$ influye directamente sobre la variable $x_j$.
+        \item \textbf{Propiedad de Markov:} cada nodo es independiente de sus ancestros, es decir: $p(x_n|x_1,\ldots,x_{n-1})=p(x_n|\operatorname{Pa}(x_n))$.
+        \item En consecuencia, la red bayesiana asociada a un DAG propone
+              \begin{equation*}
+                  p(x_1,\ldots,x_N)=\prod_{n=1}^N
+                  p(x_n|\operatorname{Pa}(x_n))
+              \end{equation*}
+        \item Para la generación se utiliza \textbf{ancestral sampling}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplos}
+    \begin{itemize}
+        \item \textbf{Mixtura:} combina $N$ distribuciones independientes, $p_1(x),\ldots,p_N(x)$, de acuerdo a una variable latente $p(z)\sim\text{Cat}(\{1,\ldots,N\})$, que elige al azar una de las distribuciones para generar la muestra visible $x$.
+              \begin{equation*}
+                  p(z,x)=p(z)\sum_{n=1}^N \delta_{n}(z)p_n(x),
+                  \quad\text{donde}\quad
+                  \delta_{n}(z):=
+                  \begin{cases}
+                      1 & \text{si }z=n \\
+                      0 & \text{si no}    \\
+                  \end{cases}
+              \end{equation*}
+        \item \textbf{Naïve Bayes:} clasificador que asume que $x_i\perp x_j|y$, para todo $i,j\in\{1,\ldots,D\}.$
+              \begin{equation*}
+                  p(x,y)=p(y)\prod_{d=1}^D p(x_d|y)
+              \end{equation*}
+              Para clasificar una nueva muestra $x\in\R^D$, este modelo calcula $p(y|x)$ mediante la regla de Bayes y elige la clase más probable.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplos}
+    \begin{itemize}
+        \item \textbf{Cadena de Markov:} modela secuencias de variables (noción temporal). Asumen que el futuro es independiente del pasado dado el presente: $p(x_{t+1}|x_1,\ldots,x_t)=p(x_{t+1}|x_t)$.
+              \begin{equation*}
+                  p(x)=p(x_1)\prod_{t=1}^{T-1} p(x_{t+1}|x_t)
+              \end{equation*}
+        \item \textbf{Modelo de Markov oculto (HMM):} modela secuencias asumiendo la existencia de una cadena de Markov latente, $z=(z_1,\ldots,z_T)$, la cual va generando las observaciones visibles $x=(x_1,\ldots,x_T)$.
+              \begin{equation*}
+                  p(z,x)=p(z_1)\prod_{t=1}^{T-1} p(z_{t+1}|z_t)\prod_{t=1}^T p(x_t|z_t)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\section{Modelos generativos modernos}
+
+\begin{frame}{Formulación naïve}
+    \begin{itemize}
+        \item El objetivo es aproximar una \textbf{distribución desconocida} $p_{\text{data}}(x)$, de la cual solo se conocen algunas muestras, $\mathcal{D}=\{x^1,\ldots,x^K\}$.
+        \item Una forma directa es usar la \textbf{distribución empírica}, cuya función de masa es
+              \begin{equation*}
+                  p_{\mathcal{D}}(x)=\frac{1}{K}\sum_{k=1}^K \delta_{x^k}(x),
+                  \quad\text{donde}\quad
+                  \delta_{x^k}(x):=
+                  \begin{cases}
+                      1 & \text{si }x=x^k \\
+                      0 & \text{si no}    \\
+                  \end{cases}
+              \end{equation*}
+        \item \textbf{Kernel density estimation} utiliza un un kernel de densidad (función de densidad con $\mathbb{E}_{x\sim \mathcal{K}}\left[x\right]=0$), $\mathcal{K}:\R\to\R_+$, para definir
+              \begin{equation*}
+                  p_{\text{KDE}}(x)=\frac{1}{K}\sum_{k=1}^K \mathcal{K}(x-x^k)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Modelos generativos modernos}
+    \begin{itemize}
+        \item \textbf{Modelo autorregresivo (ARM):} modela la generación de secuencias temporales.
+              \begin{equation*}
+                  p(x)=p(x_1)\prod_{n=1}^{T-1} p(x_{t+1}|x_1,\ldots,x_t)
+              \end{equation*}
+        \item \textbf{Autoencoder variacional (VAE):} modelo de variable latente $p(x,z)=p(z)p(x|z)$ que también entrena otro modelo $q(z|x)$ para aproximar $p(z|x)$.
+        \item \textbf{Red generativa adversaria (GAN):} modelo de variable latente $p(x,z)=p(z)p(x|z)$ que también entrena un clasificador $q(y|x)$ para reconocer imágenes falsas (usado para el entrenamiento).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Modelos generativos modernos}
+    \begin{itemize}
+        \item \textbf{Modelo de difusión (DM):} una cadena de Markov (fija) inyecta ruido a muestras de $p_\text{data}(x_0)$.
+              \begin{equation*}
+                  q(x_0,x_1,\ldots,x_T)=p_\text{data}(x_0)\prod_{t=1}^T q(x_t|x_{t-1}),
+                  \quad q(x_T)\approx\mathcal{N}(0,\text{I}_D)
+              \end{equation*}
+              Otra cadena de Markov (red neuronal) aprende a deshacer el proceso de inyección de ruido.
+              \begin{equation*}
+                  p(x_0,x_1,\ldots,x_T)=p(x_T)\prod_{t=1}^T p(x_{t-1}|x_t),
+                  \quad p(x_T)\sim\mathcal{N}(0,\text{I}_D)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Modelos generativos modernos}
+    \begin{itemize}
+        \item \textbf{Flujo normalizante (NF):} modelo de variable latente $p(x,z)=p(z)p(x|z)$ que transforma $p(z)\sim\mathcal{N}(0,\text{I}_D)$ en $x=f(z)$ a través de una serie de transformaciones aprendidas
+              \begin{align*}
+                  f(z) & =(f_N\circ\cdots\circ f_1)(z)      \\
+                       & =f_N(f_{N-1}(\cdots f_1(z)\cdots))
+              \end{align*}
+              Notar que $p(x|z)\sim\delta_{f(z)}(x)$, por lo que el valor de $z$ determina $x$ desde un comienzo.
+        \item \textbf{Flow matching (FM):} formulación a tiempo continuo de los NFs. Se puede considerar el SOTA actual en generación de imágenes.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Modelos generativos condicionales}
+    \begin{itemize}
+        \item En muchos casos se cuenta con información adicional que se quiere que influya en el proceso de generación.
+        \item En lugar de modelar $p(x)$, se busca aprender una \textbf{distribución condicional} $p(x|y)$, donde $y$ representa una variable observada fija, cuyo valor usualmente está definido por el usuario.
+        \item Algunos ejemplos son traducción de texto, generación de imágenes y video a partir de descripciones, modificación de imágenes, superresolución, chatbots y  síntesis de voz.
+        \item Cualquier modelo incondicional $p(x_1,\ldots,x_N)=\prod_{n=1}^N p(x_n|\operatorname{Pa}(x_n))$ se puede transformar en un modelo condicional mediante
+              \begin{equation*}
+                  p(x_1,\ldots,x_N|y)=\prod_{n=1}^N
+                  p(x_n|\operatorname{Pa}(x_n),y)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Modelos de variable latente.
+        \item Estimación de parámetros.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 3: Redes bayesianas (parte I)}
+\end{frame}
+
+\end{document}
