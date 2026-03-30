@@ -1,0 +1,56 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº1}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Redes bayesianas}
+\begin{enumerate}[{\bf P1.}]
+	\item Dadas 5 variables aleatorias, $x_1$, $x_2$, $x_3$, $x_4$ y $x_5$, con distribución conjunta
+	\begin{equation*}
+		p(x_1,x_2,x_3,x_4,x_5)=p(x_1)p(x_2|x_1)p(x_3|x_1)p(x_4|x_2,x_3)p(x_5|x_2,x_4)
+	\end{equation*}
+Dibuje el DAG correspondiente a esta red bayesiana.
+	\item ¿Por qué se considera intratable la inferencia de parámetros mediante el criterio de máxima verosimilitud para un modelo de variable latente? Considere como ejemplo una red bayesiana $p_\theta(x,z)=p_\theta(z)p_\theta(x|z)$, donde $x$ es la variable observable y $z$ es la variable latente.
+\end{enumerate}
+
+\section*{Modelos autorregresivos}
+\begin{enumerate}[{\bf P1.}]
+	\item Dado un vocabulario $\mathcal{V}$, un modelo de lenguaje autorregresivo factoriza la probabilidad de una secuencia de tokens $S=(w_1,\ldots,w_T)\in\mathcal{V}^*$ de manera causal, es decir:
+	\begin{equation*}
+		p_\theta(S)=p_\theta(w_1)\prod_{t=1}^{T-1} p_\theta(w_{t+1}|w_1,\ldots,w_t)
+	\end{equation*}
+	¿Qué distribución sigue cada uno de los términos $p_\theta(w_{t+1}|w_1,\ldots,w_t)$? ¿Qué parámetros tiene esta distribución?
+	\item ¿Qué es una matriz de embedding y cómo se utiliza en un modelo de lenguaje basado en redes neuronales?
+\end{enumerate}
+
+\end{document}
