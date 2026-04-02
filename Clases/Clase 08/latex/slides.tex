@@ -1,0 +1,280 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 8: Modelos autorregresivos y LLMs (parte IV)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname*{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{BERT}
+
+\begin{frame}{Bidirectional encoder representations from transformers}
+    \textbf{BERT} es un modelo tipo Transformer usado para tareas de comprensión del lenguaje.
+    \begin{itemize}
+        \item La entrada al modelo puede ser una secuencia de tokens $S\in\mathcal{V}^*$ o dos secuencias de tokens $S_1,S_2\in\mathcal{V}^*$ concatenadas.
+        \item No sigue un enfoque autorregresivo, por lo que no necesita masking causal y no puede generar texto.
+        \item Los embeddings contextuales obtenidos con BERT pueden ser usados para otras tareas. También es posible obtener un embedding representante de toda la secuencia de entrada.
+        \item BERT utiliza 3 tokens especiales: \textbf{$\text{<MASK>}$}, \textbf{$\text{<CLS>}$} y \textbf{$\text{<SEP>}$}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Tokenización}
+    \begin{itemize}
+        \item BERT añade el token $\text{<CLS>}$ al comienzo. Su embedding contextual es usado como la representación agregada de la entrada.
+        \item Las secuencias $S_1,S_2\in\mathcal{V}^*$ concatenadas son separadas por el token $\text{<SEP>}$, y cada secuencia incluye un embedding adicional:
+    \end{itemize}
+    \insertimage{bert_1}{1}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    BERT se entrena mediante dos tareas autosupervisadas:
+    \begin{itemize}
+        \item \textbf{Masked language model:} se ocultan tokens en la secuencia de entrada (se cambian por $\text{<MASK>}$) y el modelo debe predecirlos.
+        \item \textbf{Next sentence prediction:} el modelo debe predecir si el texto $S_2\in\mathcal{V}^*$ es la continuación del texto $S_1\in\mathcal{V}^*$.
+    \end{itemize}
+    \insertimage{bert_2}{0.5}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    Dada una secuencia $S=(w_1,\ldots,w_T)\in\mathcal{V}^*$, si $\tilde{S}$ es su versión enmascarada en las posiciones $\mathcal{M}(S)\subset\{1,\ldots,T\}$:
+    \begin{equation*}
+        L_\text{MLM}(S) = -\sum_{t\in\mathcal{M}(S)} \log p_\theta(w_t|\tilde{S})
+    \end{equation*}
+    Dado un par de secuencias $S_1,S_2\in\mathcal{V}^*$ y su etiqueta de clasificación binaria $y\in\{\text{IsNext},\text{NotNext}\}$:
+    \begin{equation*}
+        L_\text{NSP}(S_1, S_2) = -\log p_\theta(y| S_1, S_2)
+    \end{equation*}
+    Finalmente, BERT es entrenado con la siguiente función de pérdida combinada:
+    \begin{equation*}
+        L_\text{BERT} = \frac{1}{|\mathcal{D}_\text{MLM}|} \sum_{S\in\mathcal{D}_\text{MLM}} L_\text{MLM}(S) + \frac{1}{|\mathcal{D}_\text{NSP}|} \sum_{(S_1,S_2)\in\mathcal{D}_\text{NSP}} L_\text{NSP}(S_1, S_2)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Usos de BERT}
+    Una vez entrenado, BERT se puede utilizar para distintas tareas:
+    \begin{itemize}
+        \item Como modelo de embedding contextual para cada token o para toda la secuencia de entrada.
+        \item Para clasificación de secuencias o pares de secuencias.
+        \item Para la tarea de span extraction.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Uso como clasificador}
+    Para clasificar una secuencia o un par de secuencias, se puede utilizar el embedding contextual del token $\text{<CLS>}$.
+
+    En ambos casos es necesario cambiar el cabezal de clasificación original por otro cabezal específico para la tarea y hacer \textbf{fine tuning}.
+    \insertimage{bert_3}{1}
+\end{frame}
+
+\begin{frame}{Uso para extracción de subsecuencias}
+    Para la tarea de span extraction:
+    \begin{itemize}
+        \item Secuencia de pregunta: $S_\text{query}\in\mathcal{V}^*$.
+        \item Secuencia de contexto: $S_\text{context}\in\mathcal{V}^*$.
+        \item Secuencia concatenada: $S_\text{concat} = S_\text{query}\text{<SEP>}S_\text{context}\in\mathcal{V}^*$.
+        \item Predicción esperada: $S_\text{span}=(w_{t_\text{start}},\ldots,w_{t_\text{end}})\subset S_\text{context}$.
+    \end{itemize}
+    Para este par pregunta-respuesta, la función de pérdida es:
+    \begin{equation*}
+        \resizebox{.9\textwidth}{!}{$\displaystyle L_\text{span}(S_\text{concat}) = -\log p_\theta(t_\text{start}| S_\text{concat}) - \log p_\theta(t_\text{end}| S_\text{concat}),$}
+    \end{equation*}
+    y el fine tuning se realiza minimizando esta función de pérdida sobre un conjunto de pares pregunta-respuesta:
+    \begin{equation*}
+        L_\text{span} = \frac{1}{|\mathcal{D}_\text{span}|} \sum_{(S_\text{query}, S_\text{context}, S_\text{span})\in\mathcal{D}_\text{span}} L_\text{span}(S_\text{concat})
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Uso para extracción de subsecuencias}
+    Luego, en inferencia, dado un par $S_\text{query}, S_\text{context}\in\mathcal{V}^*$, se obtiene la secuencia concatenada $S_\text{concat}=S_\text{query}\text{<SEP>}S_\text{context}$ y se predicen los índices $t_\text{start}, t_\text{end}\in\{1,\ldots,|S_\text{context}|\}$ con mayor probabilidad:
+    \begin{equation*}
+        (t_\text{start}, t_\text{end}) = \argmax_{\substack{t_\text{start}, t_\text{end}\in\{1,\ldots,|S_\text{context}|\}\\ t_\text{start}\le t_\text{end}}} \log p_\theta(t_\text{start}, t_\text{end}| S_\text{concat}),
+        \text{ donde}
+    \end{equation*}
+    \begin{equation*}
+        \log p_\theta(t_\text{start}, t_\text{end}| S_\text{concat}) = \log p_\theta(t_\text{start}| S_\text{concat}) + \log p_\theta(t_\text{end}| S_\text{concat}),
+    \end{equation*}
+    y se devuelve el span $S_\text{span}=(w_{t_\text{start}} ,\ldots,w_{t_\text{end}})\subset S_\text{context}$ como respuesta a la pregunta $S_\text{query}$.
+\end{frame}
+
+\begin{frame}{Uso para extracción de subsecuencias}
+    \insertimage{bert_4}{0.7}
+\end{frame}
+
+\section{Modelos encoder-decoder}
+
+\begin{frame}{Modelo seq2seq}
+    Si se tiene un modelo autorregresivo condicional $p(S|S_\text{contexto})$, donde $S_\text{contexto}\in\mathcal{V}^*$ es una secuencia condicional, entonces es posible procesar ambas secuencias por modelos diferentes:
+    \begin{itemize}
+        \item Un \textbf{encoder} procesa $S_\text{contexto}$ y genera una representación contextual para $S_\text{contexto}$.
+        \item Un \textbf{decoder} genera autorregresivamente la secuencia $S\in\mathcal{V}^*$ utilizando la representación contextual obtenida con el encoder.
+    \end{itemize}
+    \insertimage{seq2seq}{1}
+\end{frame}
+
+\begin{frame}{Arquitectura Transformer}
+    El modelo \textbf{encoder-decoder}, también llamado \textbf{seq2seq}, fue modelado originalmente usando RNNs. Sin embargo, también se puede utilizar una arquitectura \textbf{Transformer}:
+    \begin{itemize}
+        \item Un encoder tipo BERT procesa todo el contexto de entrada $S_\text{contexto}$.
+        \item Un decoder tipo GPT genera la secuencia $S$ utilizando la representación contextual obtenida con el encoder.
+        \item Para esto, el decoder agrega un bloque de \textbf{atención cruzada} hacia las representaciones contextuales del encoder.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Arquitectura Transformer}
+    \begin{columns}
+        \begin{column}{0.55\textwidth}
+            \begin{itemize}
+                \item GPT y BERT son arquitecturas derivadas del Transformer original.
+                \item Hoy en día la mayoría de los modelos son de tipo GPT (\textbf{decoder-only}).
+                \item Modelos encoder-decoder como \textbf{T5} siguen siendo ampliamente utilizados en modelos text-to-image.
+                \item Los Transformers también tienen propiedades de aproximación universal y son Turing-completos.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.45\textwidth}
+            \insertimage{transformer}{1}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\section{Vision Transformer}
+
+\begin{frame}{Patchificación}
+    \begin{itemize}
+        \item BERT es un buen clasificador de secuencias, lo que motiva a transformar una imagen en una secuencia para usar BERT.
+        \item La atención tiene costo cuadrático, por lo que no se podrían clasificar imágenes de alta resolución (de dimensión $I\times I\times C$) si se trata cada pixel como un token.
+        \item \textbf{Vision Transformer (ViT)} propone dividir la imagen en \textbf{patches}, donde cada patch aplanado se trata como un token.
+    \end{itemize}
+    \insertimage{patchification}{0.5}
+\end{frame}
+
+\begin{frame}{Clasificación}
+    Teniendo esta representación secuencial de una imagen, se puede usar un modelo tipo BERT para clasificar la imagen:
+    \begin{itemize}
+        \item Al igual que en BERT, se agrega un token especial $\text{<CLS>}$ cuyo embedding se utiliza para la clasificación.
+        \item Una vez entrenado, se puede sustituir el cabezal de clasificación por otro y hacer fine tuning.
+        \item ViT en general funciona mejor que una CNN pero requiere una gran cantidad de datos para su entrenamiento.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Clasificación}
+    \insertimage{vit_1}{0.8}
+\end{frame}
+
+\begin{frame}{Visualización de la atención}
+    \begin{columns}
+        \begin{column}{0.6\textwidth}
+            Dado que el ViT posee un mecanismo de atención, es posible visualizar la atención media que recibe cada patch desde el token $\text{<CLS>}$.
+
+            Esta visualización permite interpretar qué partes de la imagen son más relevantes para la clasificación.
+        \end{column}
+        \begin{column}{0.4\textwidth}
+            \insertimage{vit_2}{0.9}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\section{CLIP}
+
+\begin{frame}{Contrastive language-image pretraining}
+    Se puede usar un image encoder (e.g. ViT) y un text encoder (e.g. BERT) para obtener representaciones de imágenes y texto en un mismo espacio de embedding.
+
+    Esto permite, por ejemplo, resolver las siguientes tareas:
+    \begin{itemize}
+        \item Dada una imagen, encontrar el texto más similar a la imagen.
+        \item Dado un texto, encontrar la imagen más similar al texto.
+        \item Realizar clustering de imágenes y texto en un mismo espacio de embedding.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Contrastive language-image pretraining}
+    \textbf{CLIP} logra esto utilizando un \textbf{enfoque contrastivo}. En particular, CLIP no es un modelo generativo.
+    \insertimage{clip_1}{0.8}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    Si $ \mathcal{D}=\{(x_n, t_n)\}_{n=1}^N$ es un conjunto de pares de imágenes $x_n\in\R^{D_\text{imagen}}$ con sus respectivos textos descriptivos $t_n\in\mathcal{V}^*$:
+    \begin{itemize}
+        \item Se calculan los vectores de embedding $\mathrm{ImageEncoder}(x_n)\in\R^{D_\text{I}}$ y $\mathrm{TextEncoder}(t_n)\in\R^{D_\text{T}}$ para cada instancia $(x_n, t_n)\in\mathcal{D}$.
+        \item Estos embeddings son proyectados a un espacio común, $\R^D$, para obtener nuevos embeddings $I_n,T_n\in\R^D$.
+        \item De este modo, CLIP se entrena maximizando la \textbf{InfoNCE}:
+              \begin{equation*}
+                  L_\text{InfoNCE} =
+                  \sum_{i=1}^N \log\left(\frac{\exp(L_{ii})}{\sum_{j=1}^N \exp(L_{ij})}\right) +
+                  \sum_{j=1}^N \log\left(\frac{\exp(L_{jj})}{\sum_{i=1}^N \exp(L_{ij})}\right),
+              \end{equation*}
+              donde $L_{ij}=s_\theta\cdot\text{SimilitudCoseno}(I_i, T_j)\in\R$, con $s_\theta>0$ un parámetro de temperatura (inversa) entrenable.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    Recordar que la \textbf{similitud coseno} entre dos vectores $u,v\in\R^D$ se define como:
+    \begin{equation*}
+        \text{SimilitudCoseno}(u, v) = \frac{\langle u, v \rangle}{\|u\|\|v\|} = \in [-1, 1].
+    \end{equation*}
+    Por otro lado, la función objetivo se puede reescribir como:
+    \begin{align*}
+        L_\text{InfoNCE}
+         & = \sum_{i=1}^N \log \text{softmax}\left(\text{fila}_i(L)\right)_i + \sum_{j=1}^N \log \text{softmax}\left(\text{columna}_j(L)\right)_j
+    \end{align*}
+\end{frame}
+
+\begin{frame}{Usos}
+    Además de los usos anteriores, se puede usar CLIP como un \textbf{open-vocabulary classifier} comparando una imagen con un conjunto de textos de la forma
+    \begin{equation*}
+        S_{\text{<CLASE>}}="\text{una imagen de un/una <CLASE>.}"
+    \end{equation*}
+    \insertimage{clip_2}{0.7}
+\end{frame}
+
+\section{Chameleon}
+
+\begin{frame}{Chameleon}
+    El modelo \textbf{Chameleon} utiliza la técnica de patchificación de imágenes para entrenar un modelo autorregresivo tipo GPT para generar texto e imágenes de manera conjunta.
+    \insertimage{chameleon}{0.9}
+\end{frame}
+
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item \textbf{LLMs:} chat templates, propiedades empíricas.
+        \item \textbf{Agentes:} RAG, uso de herramientas, ReAct.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 8: Modelos autorregresivos y LLMs (parte IV)}
+\end{frame}
+
+\end{document}
