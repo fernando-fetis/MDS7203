@@ -1,0 +1,367 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 9: Modelos autorregresivos y LLMs (parte V)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Pre-training y optimización}
+
+\begin{frame}{Motivación}
+    El entrenamiento de un LLM moderno es un proceso complejo que involucra varias técnicas y heurísticas para optimizar el rendimiento y la eficiencia.
+
+    En particular, el alto costo computacional y la inestabilidad del entrenamiento requieren estrategias específicas para manejar grandes modelos y datasets masivos.
+\end{frame}
+
+\begin{frame}{Entrenamiento distribuido}
+    Entrenar un LLM moderno tiene varias dificultades:
+    \begin{itemize}
+        \item El modelo no cabe en la memoria de una sola GPU.
+        \item El tiempo de entrenamiento sería prohibitivo en una sola GPU.
+        \item Los datasets de pre-training contienen billones de tokens.
+    \end{itemize}
+    Debido a esto, es usual distribuir el entrenamiento en múltiples GPUs. Existen distintas estrategias:
+    \begin{itemize}
+        \item \textbf{Paralelización de datos.}
+        \item \textbf{Paralelización de modelo}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Paralelización de datos}
+    En \textbf{data parallelism}, el modelo se replica en cada GPU y los datos se dividen en mini-batches. Cada GPU calcula gradientes locales que luego se agregan mediante \textbf{all-reduce}.
+    \insertimage{data_parallelism}{1}
+\end{frame}
+
+\begin{frame}{Paralelización de tensor}
+    En \textbf{tensor parallelism} (tipo de model parallelism), las operaciones matriciales se dividen entre GPUs.
+
+    Luego, las salidas parciales se combinan (e.g.\ mediante all-reduce) para el siguiente paso.
+    \insertimage{tensor_parallelism}{1}
+\end{frame}
+
+\begin{frame}{Learning rate scheduling}
+    Una técnica crucial para el entrenamiento de LLMs es el \textbf{learning rate scheduling}, donde la tasa de aprendizaje $\eta_t>0$ varía durante el entrenamiento. Algunas técnicas usuales son:
+    \begin{itemize}
+        \item \textbf{Decaimiento exponencial:} $\eta_t = \eta_0 \cdot \gamma^t$, con $\gamma < 1$.
+        \item \textbf{Cosine annealing:} decae suavemente de $\eta_0$ a $\eta_{\min}$ en $T$ pasos:
+              \begin{equation*}
+                  \eta_t = \eta_{\min} + \frac{\eta_0 - \eta_{\min}}{2}\left(1 + \cos\left(\frac{\pi t}{T}\right)\right)
+              \end{equation*}
+        \item \textbf{Step decay:} reduce $\eta_t$ por un factor fijo cada $k$ épocas.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Warmup}
+    Al inicio del entrenamiento:
+    \begin{itemize}
+        \item Los pesos están inicializados aleatoriamente, produciendo gradientes ruidosos.
+        \item Las estadísticas de Adam aún no han convergido.
+        \item Una tasa de aprendizaje alta puede causar actualizaciones muy grandes, llevando a divergencia o inestabilidad numérica.
+    \end{itemize}
+    Por lo tanto, es usual usar un \textbf{learning rate warmup} al inicio del entrenamiento, incrementando gradualmente la tasa de aprendizaje durante las primeras $T_{\text{warmup}}$ iteraciones:
+    \begin{equation*}
+        \eta_t = \eta_0 \cdot \frac{t}{T_{\text{warmup}}}, \quad \text{para } t \leq T_{\text{warmup}}
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Warmup + cosine decay}
+    El esquema \textbf{warmup + cosine decay} es estándar en LLMs:
+    \begin{equation*}
+        \eta_t = \begin{cases}
+            \displaystyle\eta_0 \cdot \frac{t}{T_{\text{warmup}}}                                                                                                & \text{si } t \leq T_{\text{warmup}} \\[1em]
+            \displaystyle\eta_{\min} + \frac{\eta_0 - \eta_{\min}}{2}\left(1 + \cos\left(\frac{\pi (t - T_{\text{warmup}})}{T - T_{\text{warmup}}}\right)\right) & \text{si no}
+        \end{cases}
+    \end{equation*}
+    \insertimage{lr_scheduling}{1.0}
+\end{frame}
+
+\begin{frame}{Gradient clipping}
+    Otra heurística importante es \textbf{gradient clipping}, que limita la magnitud de los gradientes para estabilizar el entrenamiento:
+    \begin{itemize}
+        \item \textbf{Clip por valor:} $g_i \leftarrow \text{clip}(g_i, -c, c)$.
+        \item \textbf{Clip por norma:} si $\|g\| > c$, entonces $g \leftarrow c \cdot \frac{g}{\|g\|}$.
+    \end{itemize}
+    Esto previene el \textbf{exploding gradient problem}.
+    \insertimage{gradient_clipping}{1}
+\end{frame}
+
+\begin{frame}{Early stopping}
+    Para evitar el overfitting, se puede usar \textbf{early stopping}, que detiene el entrenamiento cuando la evaluación en el conjunto de validación deja de mejorar:
+    \begin{itemize}
+        \item Se monitorea $L_{\text{val}}$ cada $k\in\N$ iteraciones.
+        \item Se guarda el mejor modelo según $L_{\text{val}}$.
+        \item Se detiene si $L_{\text{val}}$ no mejora en $P\in\N$ evaluaciones consecutivas.
+    \end{itemize}
+    En el pre-training de LLMs modernos, el overfitting es raro debido al tamaño del corpus.
+
+    Early stopping es más relevante en fine-tuning.
+\end{frame}
+
+\begin{frame}{Early stopping}
+    \insertimage{early_stopping}{1}
+\end{frame}
+
+\begin{frame}{Label smoothing}
+    Para mejorar la generalización, se puede usar \textbf{label smoothing}, que suaviza las etiquetas one-hot. En lugar de usar $q(y) = \delta_{y^*}(y)$, se define:
+    \begin{equation*}
+        q_{\text{smooth}}(y) = (1-\epsilon)\cdot\delta_{y^*}(y) + \frac{\epsilon}{|\mathcal{V}|}
+    \end{equation*}
+    donde $\epsilon \in (0, 1)$ es el parámetro de suavizado y $|\mathcal{V}|$ es el tamaño del vocabulario. Esto tiene varios beneficios:
+    \begin{itemize}
+        \item Previene que el modelo sea sobreconfiado en sus predicciones.
+        \item Regulariza los logits, evitando que crezcan indefinidamente.
+        \item Mejora la generalización a datos no vistos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Exponential moving average}
+    Los pesos $\theta^{(t)}$ actualizados por el optimizador son ruidosos debido a la aleatoriedad de los mini-batches.
+
+    Para obtener una estimación más estable, se puede mantener un \textbf{exponential moving average (EMA)} de los pesos:
+    \begin{equation*}
+        \theta_{\text{EMA}}^{(t)} = \beta \cdot \theta_{\text{EMA}}^{(t-1)} + (1-\beta) \cdot \theta^{(t)},
+    \end{equation*}
+    donde $\beta \in (0.99, 0.9999)$ controla la tasa de decaimiento.
+
+    Los pesos EMA suelen generalizar mejor que los pesos finales del optimizador, por lo que se suelen usar para inferencia.
+\end{frame}
+
+\begin{frame}{Exponential moving average}
+    \insertimage{ema}{0.85}
+\end{frame}
+
+\begin{frame}{Inicialización de pesos}
+    La \textbf{inicialización de pesos} permite mantener la varianza de las activaciones estable a través de las capas.
+
+    Para una matriz de parámetros $W \in \mathcal{M}_{n_{\text{in}}, n_{\text{out}}}(\R)$:
+    \begin{itemize}
+        \item \textbf{Xavier/Glorot (tanh, sigmoide):}
+              \begin{equation*}
+                  W_{ij} \sim \mathcal{U}\left(-\sqrt{\frac{6}{n_{\text{in}} + n_{\text{out}}}}, \sqrt{\frac{6}{n_{\text{in}} + n_{\text{out}}}}\right)
+              \end{equation*}
+        \item \textbf{He/Kaiming (ReLU):}
+              \begin{equation*}
+                  W_{ij} \sim \mathcal{N}\left(0, \frac{2}{n_{\text{in}}}\right)
+              \end{equation*}
+        \item \textbf{LeCun (SELU):}
+              \begin{equation*}
+                  W_{ij} \sim \mathcal{N}\left(0, \frac{1}{n_{\text{in}}}\right)
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Mixed precision training}
+    Por otro lado, se puede usar \textbf{mixed precision training} para reducir el uso de memoria y acelerar el cómputo:
+    \begin{itemize}
+        \item \textbf{FP16/BF16:} para forward pass y backward pass.
+        \item \textbf{FP32:} para acumulación de gradientes y actualización de pesos.
+    \end{itemize}
+    Sin embargo, el uso de baja precisión puede causar underflow en los gradientes. Para mitigar esto, se usan técnicas como:
+    \begin{itemize}
+        \item \textbf{Loss scaling:} escala la pérdida por un factor grande para evitar underflow, y los gradientes se desescalan antes de la actualización.
+        \item \textbf{Master weights:} mantiene una copia de los pesos en FP32 para la actualización, pero el forward/backward se hace en FP16.
+    \end{itemize}
+\end{frame}
+
+\section{Large language models}
+
+\begin{frame}[fragile]{Chat templates}
+    Para construir un modelo conversacional, los LLMs utilizan \textbf{chat templates} que estructuran las interacciones.
+
+    Usualmente, se definen 3 roles delimitados por tokens especiales. Usando el formato \textbf{ChatML} de OpenAI:
+    \begin{itemize}
+        \item \textbf{System:} instrucciones globales y contexto del modelo.
+        \item \textbf{User:} mensajes del usuario.
+        \item \textbf{Assistant:} respuestas del modelo.
+    \end{itemize}
+    \small
+    \begin{verbatim}
+<|im_start|>system
+Eres un asistente experto en matemáticas.<|im_end|>
+<|im_start|>user
+¿Cuál es la derivada de x^3?<|im_end|>
+<|im_start|>assistant
+La derivada de x^3 es 3x^2.<|im_end|>
+    \end{verbatim}
+\end{frame}
+
+\begin{frame}{Instruction hierarchy}
+    En modelos conversacionales, la \textbf{instruction hierarchy} establece un orden de obediencia de las instrucciones:
+    \begin{enumerate}
+        \item \textbf{System prompt:} máxima prioridad, define el comportamiento base y suele mantenerse oculto.
+        \item \textbf{User instructions:} instrucciones del usuario al modelo.
+        \item \textbf{Contenido externo y outputs del modelo:} documentos (RAG), resultados de herramientas, texto generado, etc.
+    \end{enumerate}
+    Respetar esta jerarquía ayuda a prevenir ataques como \textbf{prompt injection} y requiere entrenamiento específico durante el post-training.
+\end{frame}
+
+\begin{frame}{Fine-tuning conversacional}
+    El \textbf{fine-tuning conversacional} adapta un modelo de lenguaje pre-entrenado para interacciones multi-turno:
+    \begin{itemize}
+        \item Se entrena sobre un conjunto de conversaciones con el formato de chat template.
+        \item La pérdida se calcula solo sobre los tokens del \textbf{assistant}.
+        \item Se incluyen ejemplos de rechazo de solicitudes.
+    \end{itemize}
+    Sin embargo, esto no es suficiente para alinear completamente el modelo con preferencias humanas.
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    Una \textbf{ley de escala} es una relación empírica entre la pérdida $L$ y algún recurso $X$ (parámetros, datos, cómputo):
+    \begin{equation*}
+        L(X) = \left(\frac{X_c}{X}\right)^\alpha + L_\infty,
+    \end{equation*}
+    donde $X_c$ es una constante de escala, $\alpha > 0$ es el exponente, y $L_\infty$ es la pérdida irreducible.
+    \begin{columns}
+        \column{0.4\textwidth}
+        \begin{itemize}
+            \item En escala log-log, la relación es lineal.
+            \item Permite extrapolar rendimiento.
+            \item Mayor $\alpha$ implica decaimiento más rápido.
+        \end{itemize}
+        \column{0.6\textwidth}
+        \insertimage{scaling_laws}{1}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    En una investigación de OpenAI se estudió cómo escala $L$ respecto al número de parámetros $N$, la cantidad de datos $D$ y el cómputo $C$ por separado:
+    \insertimage{scale_1}{1}
+    Es decir: $L \propto N^{-0.076}$, $L \propto D^{-0.095}$, $L \propto C^{-0.050}$.
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    También pudieron concluir cómo asignar eficientemente un presupuesto de cómputo $C$ entre la cantidad de parámetros $N$ y la cantidad de datos $D$.
+
+    Observaron que el tamaño del modelo debe crecer mucho más rápido que la cantidad de datos.
+    \insertimage{scale_3}{0.8}
+\end{frame}
+
+\begin{frame}{Leyes de escala}
+    También mostraron que la arquitectura específica (FF ratio, aspect ratio, head dimension) tiene poco impacto:
+    \insertimage{scale_2}{1}
+    Esto va en línea con la idea de \textbf{the bitter lesson} de Sutton.
+\end{frame}
+
+\begin{frame}{Habilidades emergentes}
+    Una habilidad se dice \textbf{emergente} si aparece de manera abrupta al escalar el modelo, pasando de rendimiento aleatorio a alto en un rango estrecho de escala.
+
+    Este fenómeno sugeriría la existencia de \textbf{transiciones de fase} en las capacidades de los modelos, dificultando predecir qué habilidades aparecerán al escalar.
+
+    Un trabajo posterior argumenta que la emergencia es un \textbf{artefacto de las métricas discretas}. Al usar métricas continuas, el rendimiento mejora de manera suave y predecible, sin saltos abruptos.
+\end{frame}
+
+\begin{frame}{Habilidades emergentes}
+    \insertimage{emergent_abilities}{1}
+\end{frame}
+
+\section{Alignment y fine-tuning}
+
+\begin{frame}{Post-training}
+    El \textbf{post-training} adapta un modelo pre-entrenado para tareas específicas. El pipeline típico tiene tres etapas:
+    \begin{enumerate}
+        \item \textbf{Pre-training:} next-token prediction sobre corpus masivo.
+        \item \textbf{Supervised Fine-Tuning (SFT):} entrenamiento sobre datos de mejor calidad y formato conversacional.
+        \item \textbf{Alignment:} alineación con preferencias humanas.
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Supervised Fine-Tuning}
+    \textbf{SFT} entrena el modelo sobre pares instrucción-respuesta usando la misma pérdida que en el pre-training (máxima verosimilitud), pero solo sobre los tokens de la respuesta.
+
+    El dataset de SFT típicamente incluye conversaciones estructuradas, ejemplos de rechazo a solicitudes inapropiadas, y ejemplos de tareas y estilos de respuesta.
+
+    Sin embargo, SFT no es suficiente para alignment porque es costoso crear datos que cubran todos los casos y muchas veces es difícil definir explícitamente las preferencias humanas en un dataset o en una función de costo.
+\end{frame}
+
+\begin{frame}{Reinforcement Learning from Human Feedback}
+    \textbf{RLHF} alinea el modelo usando preferencias humanas. El proceso tiene tres etapas:
+    \begin{enumerate}
+        \item \textbf{Recolección de preferencias:} humanos comparan pares de respuestas para una misma instrucción.
+        \item \textbf{Entrenamiento de un reward model:} se entrena un modelo para predecir preferencias.
+        \item \textbf{Optimización con RL:} se optimiza el LLM para maximizar el reward usando reward model entrenado.
+    \end{enumerate}
+    Por lo tanto, un dataset de preferencias tiene la forma $\mathcal{D}_{\text{pref}} = \{(x, y_1, y_0)\}$, donde $y_1$ es la respuesta preferida e $y_0$ es la respuesta rechazada.
+\end{frame}
+
+\begin{frame}{RLHF | Reward model}
+    El \textbf{reward model} $r_\phi(x, y)$ se entrena para predecir preferencias usando el modelo de Bradley-Terry:
+    \begin{equation*}
+        p(y_1 \succ y_0 | x) = \sigma(r_\phi(x, y_1) - r_\phi(x, y_0))
+    \end{equation*}
+    Este modelo es entrenado mediante máxima verosimilitud:
+    \begin{equation*}
+        \max_\phi \mathbb{E}_{(x, y_1, y_0) \sim \mathcal{D}_{\text{pref}}} \left[\log \sigma(r_\phi(x, y_1) - r_\phi(x, y_0))\right]
+    \end{equation*}
+    El reward model típicamente se inicializa desde el modelo SFT y reemplaza el cabezal de lenguaje por un cabezal escalar.
+\end{frame}
+
+\begin{frame}{RLHF | Optimización del LLM}
+    Con el reward model $r_\phi$ entrenado, se optimiza el LLM para maximizar la recompensa regularizada:
+    \begin{equation*}
+        \max_\theta \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi_\theta(\cdot|x)} \left[r_\phi(x, y) - \beta \cdot \operatorname{D_{KL}}(\pi_\theta \| \pi_{\text{ref}})\right],
+    \end{equation*}
+    donde $\pi_{\text{ref}}$ es el modelo SFT y $\beta > 0$ es un hiperparámetro.
+
+    Si bien se puede optimizar esta función objetivo directamente (e.g. con REINFORCE), usualmente se utilizan algoritmos más eficientes como \textbf{proximal policy optimization (PPO)}.
+
+    También es posible optimizar directamente la función de preferencia sin necesidad de un reward model separado utilizando \textbf{direct preference optimization (DPO)}.
+\end{frame}
+
+\begin{frame}{Low-Rank Adaptation}
+    \textbf{LoRA} es una técnica de \textbf{parameter-efficient fine-tuning (PEFT)} que representa las actualizaciones de pesos como productos de matrices de bajo rango.
+
+    Para una matriz de pesos $W_0 \in \mathcal{M}_{d,k}(\R)$:
+    \begin{equation*}
+        W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} BA
+    \end{equation*}
+    donde $B \in \mathcal{M}_{d,r}(\R)$, $A \in \mathcal{M}_{r,k}(\R)$, $r \ll \min(d, k)$, y $\alpha$ es un hiperparámetro de escala.
+
+    $W_0$ permanece congelado durante el entrenamiento, y solo se entrenan $A$ y $B$. Esto reduce los parámetros de $dk$ a $r(d+k)$.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Técnicas de inferencia e inferencia eficiente.
+        \item Prompting y sistemas agénticos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 9: Modelos autorregresivos y LLMs (parte V)}
+\end{frame}
+
+\end{document}
