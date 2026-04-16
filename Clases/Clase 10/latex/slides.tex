@@ -1,0 +1,403 @@
+\documentclass{beamer}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 10: Modelos autorregresivos y LLMs (parte VI)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+\setlength{\leftmargini}{0em}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Estrategias de decodificación}
+
+\begin{frame}{Recuerdo de modelos de lenguaje}
+    Un modelo de lenguaje autorregresivo modela distribuciones condicionales de la forma
+    \begin{equation*}
+        p_\theta(w_{t+1}| w_1,\ldots,w_t)\sim\text{Categórica}\!\left(\mathcal{V};\;\lambda_\theta(w_1,\ldots,w_t)\right),
+    \end{equation*}
+    donde $\lambda_\theta(w_1,\ldots,w_t)\in\Delta^{|\mathcal{V}|}$ es un vector de probabilidades sobre $\mathcal{V}$, el cual depende del contexto.
+
+    Una red neuronal (e.g. RNN o GPT) recibe el contexto y entrega un vector de logits $l\in\R^{|\mathcal{V}|}$ que permite definir $\lambda_\theta=\operatorname{softmax}(l)$.
+
+    La generación de texto utiliza iterativamente las distribuciones $w_{t+1}\sim\text{Categórica}(\mathcal{V};\,\lambda_\theta(w_1,\ldots,w_t))$ utilizando distintas \textbf{técnicas de decodificación}.
+\end{frame}
+
+\begin{frame}{Recuerdo de temperatura}
+    Una heurística usual consiste en utilizar la idea de \textbf{temperatura}, donde los logits $l\in\R^{|\mathcal{V}|}$ son reescalados según una constante $\tau>0$ antes de softmax:
+    \begin{equation*}
+        \lambda_\theta^{(\tau)}=\operatorname{softmax}\left(\frac{l}{\tau}\right)\in\Delta^{|\mathcal{V}|}
+    \end{equation*}
+    \vspace{-0.8cm}
+    \begin{itemize}
+        \item $\tau\to 0$ equivale a greedy decoding.
+        \item $\tau>1$ permite una mayor diversidad.
+        \item $\tau<1$ puede mejorar coherencia a costa de diversidad.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Recuerdo de top-$K$ sampling}
+    Otra técnica usual es \textbf{top-$K$ sampling}, donde se restringe la distribución a asignar masa solo a los $K$ tokens más probables, $\mathcal{I}=\{k_1,\ldots,k_K\}$:
+    \begin{equation*}
+        \tilde\lambda_{\theta,k}=\begin{cases}
+            \dfrac{\lambda_{\theta,k}}{\sum_{i\in\mathcal{I}}\lambda_{\theta,i}} & \text{si }k\in\mathcal{I}    \\[0.5em]
+            0                                                                    & \text{si }k\notin\mathcal{I}
+        \end{cases}
+    \end{equation*}
+    Con esto, el decoding se realiza considerando el vector de probabilidad $\tilde\lambda_\theta\in\Delta^{|\mathcal{V}|}$ en lugar de $\lambda_\theta\in\Delta^{|\mathcal{V}|}$.
+
+    Sin embargo, en este método $K$ es fijo y no se adapta a la forma de la distribución $p_\theta(w_{t+1}| w_1,\ldots,w_t)$.
+\end{frame}
+
+\begin{frame}{Top-$p$ sampling}
+    Una versión dinámica de top-$K$ sampling es \textbf{nucleus sampling}, donde se selecciona el subconjunto más pequeño de tokens cuya masa acumulada es al menos $p\in(0,1]$.
+
+    Si $\lambda_{\sigma(1)}\geq\lambda_{\sigma(2)}\geq\cdots\geq\lambda_{\sigma(|\mathcal{V}|)}$ son las componentes de $\lambda_\theta$ ordenadas de mayor a menor, nucleus sampling distribuye la masa de $\lambda_\theta$ sobre el conjunto $\mathcal{V}_p=\{a_{\sigma(1)},\ldots,a_{\sigma(K_p)}\}$, donde
+    \begin{equation*}
+        K_p=\min\left\{K\in\{1,\ldots,|\mathcal{V}|\}:\sum_{i=1}^{K}\lambda_{\sigma(i)}\geq p\right\}
+    \end{equation*}
+    A diferencia de top-$K$, el tamaño del conjunto $\mathcal{V}_p\subset\mathcal{V}$ varía dinámicamente.
+\end{frame}
+
+\begin{frame}{Top-$p$ sampling}
+    \insertimage{topp}{1}
+\end{frame}
+
+\begin{frame}{Beam search}
+    Las técnicas anteriores solo modifican la distribución del próximo token, pero no consideran la secuencia completa.
+
+    La técnica de \textbf{beam search} mantiene las $B\geq1$ secuencias más probables en cada paso de generación y les asigna un \textbf{score}:
+    \begin{equation*}
+        \operatorname{score}(w_1,\ldots,w_t):=\frac{1}{t^\alpha}\log p_\theta(w_1,\ldots,w_t),
+    \end{equation*}
+    donde $\alpha\in[0,1]$ es un hiperparámetro de normalización que evita favorecer secuencias cortas.
+
+    En cada paso, se generan todas las continuaciones posibles de las $B$ secuencias actuales, se calculan sus scores, y se retienen solo las $B$ secuencias con mayor score para el siguiente paso.
+\end{frame}
+
+\begin{frame}{Beam search}
+    \insertimage{beam_search}{1}
+\end{frame}
+
+\section{Inferencia eficiente}
+
+\begin{frame}{Motivación}
+    La inferencia de LLMs presenta varios desafíos:
+    \begin{itemize}
+        \item \textbf{Latencia:} a diferencia del entrenamiento, la generación token a token es inherentemente secuencial.
+        \item \textbf{Memoria:} modelos grandes no caben en una sola GPU.
+        \item \textbf{Throughput:} servir muchos usuarios simultáneamente requiere optimización.
+    \end{itemize}
+    Existen técnicas para optimizar a nivel de \textbf{arquitectura} (MQA, GQA), \textbf{cómputo} (KV caching) y \textbf{compresión} (cuantización, pruning y/o destilación).
+\end{frame}
+
+\begin{frame}{KV cache}
+    El mecanismo de atención define proyecciones $k_t=W_K\,x_t\in\R^P$ y $v_t=W_V\,x_t\in\R^P$ con $W_K,W_V\in\mathcal{M}_{P,D}(\R)$.
+
+    Sin embargo, para generar el token $w_{t+1}\in\mathcal{V}$ se necesitan las proyecciones de todos los tokens previos, lo que implica recalcular $k_i,v_i\in\R^P$ para cada $i\in\{1,\ldots,t\}$ en cada paso.
+
+    La técnica de \textbf{KV caching} almacena estas proyecciones para reutilizarlas en la generación:
+    \begin{equation*}
+        K_{1:t}=\begin{pmatrix}k_1^\top\\\vdots\\k_t^\top\end{pmatrix}\!\in\mathcal{M}_{t,P}(\R),\qquad
+        V_{1:t}=\begin{pmatrix}v_1^\top\\\vdots\\v_t^\top\end{pmatrix}\!\in\mathcal{M}_{t,P}(\R)
+    \end{equation*}
+    Esto permite reducir drásticamente el tiempo de cómputo en cada paso, a costa de un overhead de memoria que crece linealmente con la longitud de la secuencia.
+\end{frame}
+
+\begin{frame}{KV cache}
+    \insertimage{kv_cache}{1}
+\end{frame}
+
+\begin{frame}{MQA y GQA}
+    Considerando que MHA utiliza $H\in\N$ cabezas, cada una con matrices de proyección individuales, el costo de memoria para almacenar el KV cache puede ser muy alto.
+
+    Existen dos alternativas que reducen este costo:
+    \begin{itemize}
+        \item \textbf{Multi-Query Attention (MQA):} todas las cabezas comparten un único par $W_K,W_V\in\mathcal{M}_{P,D}(\R)$. Cada cabeza mantiene su $W_Q^{(h)}$.
+        \item \textbf{Grouped-Query Attention (GQA):} las $H$ cabezas se agrupan en $G$ grupos, cada grupo comparte un par $W_K^{(g)},W_V^{(g)}\in\mathcal{M}_{P,D}(\R)$.
+    \end{itemize}
+    Estas variantes de MHA reducen el costo de memoria del KV cache y, en la práctica, no degradan significativamente la calidad del modelo.
+\end{frame}
+
+\begin{frame}{MHA, MQA y GQA}
+    \insertimage{mqa_gqa}{1}
+\end{frame}
+
+\begin{frame}{Cuantización}
+    La técnica de \textbf{cuantización} reduce la precisión numérica de los distintos parámetros de un modelo neuronal:
+    \begin{itemize}
+        \item FP32 $\to$ FP16: 2$\times$ reducción de memoria.
+        \item FP32 $\to$ INT8: 4$\times$ reducción.
+        \item FP32 $\to$ INT4: 8$\times$ reducción.
+    \end{itemize}
+    Existen dos enfoques principales:
+    \begin{itemize}
+        \item \textbf{Post-Training Quantization (PTQ):} cuantiza un modelo ya entrenado. Dos métodos populares son GPTQ y AWQ.
+        \item \textbf{Quantization-Aware Training (QAT):} simula la cuantización durante el entrenamiento para que el modelo aprenda a ser robusto a ella. Es de mejor calidad pero también mayor costo.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Pruning}
+    El \textbf{pruning} de una red neuronal consiste en eliminar pesos o estructuras del modelo que contribuyen poco a la salida:
+    \begin{itemize}
+        \item \textbf{Unstructured pruning:} elimina pesos individuales por magnitud u otros criterios. Produce matrices sparse difíciles de acelerar en hardware estándar.
+        \item \textbf{Structured pruning:} elimina estructuras completas (neuronas, cabezas de atención, capas). Más fácil de acelerar en hardware.
+    \end{itemize}
+    Para esto, lo usual es entrenar un modelo completo, identificar pesos poco importantes, eliminarlos, y (opcionalmente) hacer fine-tuning para recuperar rendimiento.
+\end{frame}
+
+\begin{frame}{Knowledge distillation}
+    La \textbf{destilación} de un modelo consiste en entrenar un modelo \textbf{student} $p_{\theta_S}$ (pequeño) para imitar a un modelo \textbf{teacher} $p_{\theta_T}$ (grande) sobre un dataset $\mathcal{D}=\{S^1,\ldots,S^N\}\subset\mathcal{V}^*$.
+
+    Para cada posición $t$ de una secuencia, sean $l_T,l_S\in\R^{|\mathcal{V}|}$ los logits temperados del teacher y student:
+    \begin{equation*}
+        \lambda_T^{(\tau)}=\operatorname{softmax}(l_T/\tau)\in\Delta^{|\mathcal{V}|},\quad \lambda_S^{(\tau)}=\operatorname{softmax}(l_S/\tau)\in\Delta^{|\mathcal{V}|}
+    \end{equation*}
+    La función de pérdida de destilación combina hard labels (token real $w_{t+1}$) y soft labels
+    (distribución del teacher):
+    \begin{equation*}
+        \mathcal{L}^\text{KD}_t(\theta_S)=\alpha\cdot\underbrace{\text{CE}(w_{t+1},\,\lambda_S^{(1)})}_{\text{hard labels}}+(1-\alpha)\cdot\tau^2\cdot\underbrace{\text{KL}(\lambda_T^{(\tau)}\|\lambda_S^{(\tau)})}_{\text{soft labels}}
+    \end{equation*}
+    con $\alpha\in[0,1]$ un hiperparámetro. Luego, $\mathcal{L}^\text{KD}_t(\theta_S)$ se promedia sobre todas las posiciones y secuencias de $\mathcal{D}$.
+\end{frame}
+
+\begin{frame}{Knowledge distillation}
+    El uso de una temperatura $\tau>0$ suaviza las distribuciones, revelando las probabilidades relativas de tokens no dominantes (\textbf{dark knowledge}). El factor $\tau^2$ corrige la magnitud de los gradientes al escalar los logits.
+
+    Existen otras variantes de destilación:
+    \begin{itemize}
+        \item \textbf{Destilación de capas intermedias:} alinear representaciones internas del modelo.
+        \item \textbf{Destilación con datos sintéticos:} el modelo teacher genera secuencias de alta calidad y el modelo student se entrena sobre ellas.
+    \end{itemize}
+\end{frame}
+
+\section{Prompting}
+
+\begin{frame}{In-Context Learning}
+    \textbf{in-context learning (ICL)} es la capacidad de los LLMs de realizar tareas especificadas únicamente mediante el prompt, sin actualizar sus parámetros.
+
+    Esta capacidad emerge del pre-training sobre texto diverso, donde el modelo aprende a reconocer patrones en el contexto y a continuar coherentemente.
+    \begin{itemize}
+        \item \textbf{Zero-shot:} solo se describe la tarea, sin ejemplos.
+        \item \textbf{Few-shot:} se entregan $k$ ejemplos resueltos antes de la consulta.
+        \item \textbf{Instruction-based:} la tarea se describe con instrucciones simples en lenguaje natural.
+    \end{itemize}
+    GPT-3 demostró que la capacidad ICL mejora con la escala del modelo.
+\end{frame}
+
+\begin{frame}[fragile]{In-Context Learning}
+    \footnotesize
+    \textbf{Zero-shot:}
+    \begin{verbatim}
+Clasifica el sentimiento como positivo o negativo.
+Texto: La película fue increíble. Sentimiento:
+    \end{verbatim}
+
+    \textbf{Few-shot:}
+    \begin{verbatim}
+Clasifica el sentimiento como positivo o negativo.
+Texto: Me encantó el libro. Sentimiento: positivo
+Texto: El servicio fue terrible. Sentimiento: negativo
+Texto: La película fue increíble. Sentimiento:
+    \end{verbatim}
+\end{frame}
+
+\begin{frame}{Chain of Thought}
+    \textbf{CoT prompting} induce al modelo a generar pasos de razonamiento intermedios antes de la respuesta final. Existen dos variantes principales:
+    \begin{itemize}
+        \item \textbf{Few-shot CoT:} incluye ejemplos con razonamiento explícito.
+        \item \textbf{Zero-shot CoT:} agrega ``think step by step'' al prompt.
+    \end{itemize}
+    Si bien esta es una técnica trivial de utilizar, hoy en día existen resultados teóricos acerca de su funcionamiento y la clase de problemas que permite resolver.
+\end{frame}
+
+\begin{frame}[fragile]{Chain of Thought}
+    \footnotesize
+    \textbf{Zero-shot CoT:}
+    \begin{verbatim}
+P: Si tengo 3 manzanas y compro 2 bolsas
+con 4 manzanas cada una, ¿cuántas tengo?
+Pensemos paso a paso.
+    \end{verbatim}
+    \textbf{Respuesta del modelo:}
+    \begin{verbatim}
+1. Empiezo con 3 manzanas.
+2. Cada bolsa tiene 4 manzanas.
+3. Compro 2 bolsas: 2 x 4 = 8 manzanas.
+4. Total: 3 + 8 = 11 manzanas.
+    \end{verbatim}
+\end{frame}
+
+\begin{frame}{Self-refinement}
+    El \textbf{self-refinement} permite al modelo mejorar iterativamente su respuesta:
+    \begin{equation*}
+        \text{Generate}\;\to\;\text{Critique}\;\to\;\text{Refine}\;\to\;\cdots
+    \end{equation*}
+    \begin{enumerate}
+        \item El modelo genera una respuesta inicial.
+        \item El mismo modelo (con un prompt distinto) critica la respuesta, identificando errores.
+        \item El modelo refina la respuesta incorporando la crítica.
+    \end{enumerate}
+    Es efectivo cuando el modelo puede juzgar la calidad de una respuesta mejor de lo que puede generarla óptimamente en un solo intento.
+
+    No requiere herramientas externas ni memoria, sino que es una técnica puramente de prompting.
+\end{frame}
+
+\begin{frame}{Prompt tuning}
+    El \textbf{prompt tuning} adapta un LM congelado $p_\theta$ a una tarea específica agregando $k$ vectores continuos entrenables a la entrada.
+
+    Dados los embeddings de entrada $x_1,\ldots,x_T\in\R^D$ y vectores entrenables $p_1,\ldots,p_k\in\R^D$ (agrupados en $P\in\mathcal{M}_{k,D}(\R)$):
+    \begin{equation*}
+        \text{entrada al modelo:}\quad (p_1,\ldots,p_k,\,x_1,\ldots,x_T)
+    \end{equation*}
+    Se optimiza $P$ manteniendo $\theta$ congelado:
+    \begin{equation*}
+        \min_{P}\;\frac{1}{|\mathcal{D}_\text{task}|}\sum_{(x,y)\in\mathcal{D}_\text{task}}\mathcal{L}\!\left(p_\theta(y| P,x),\;y\right)
+    \end{equation*}
+    Esta técnica corresponde a un caso de PEFT, donde el prompt incluye un conjunto de parámetros continuos optimizados para la tarea.
+\end{frame}
+
+\begin{frame}{Prompt tuning}
+    \insertimage{soft_prompting}{1}
+\end{frame}
+
+\section{Agentes}
+
+\begin{frame}{Agentes basados en LLMs}
+    Un \textbf{agente} basado en un LLM usa el modelo como controlador central para razonar, planificar y ejecutar acciones en un entorno.
+
+    \textbf{Componentes:}
+    \begin{itemize}
+        \item \textbf{LLM} ($p_\theta$): procesa información, razona y decide acciones.
+        \item \textbf{Herramientas} ($\mathcal{T}=\{f_1,\ldots,f_M\}$): funciones externas invocables (APIs, búsqueda web, intérprete de código).
+        \item \textbf{Memoria} ($\mathcal{M}$): almacena historial de interacciones y contexto relevante más allá de la ventana de contexto.
+        \item \textbf{Planificación:} descomposición de tareas complejas en subtareas ejecutables.
+    \end{itemize}
+    En cada paso, el agente observa el estado actual, razona sobre qué acción tomar, ejecuta la acción y observa el resultado.
+\end{frame}
+
+\begin{frame}{Retrieval-Augmented Generation}
+    \textbf{RAG} aumenta el LLM con conocimiento externo recuperado de una base de datos vectorial. Dado un query $x$:
+    \begin{enumerate}
+        \item \textbf{Indexing (offline):} los documentos se dividen en fragmentos $\{d_1,\ldots,d_N\}$ y se codifican como embeddings $e_i=\operatorname{enc}(d_i)\in\R^D$ en una base vectorial.
+        \item \textbf{Retrieval:} se codifica el query $e_x=\operatorname{enc}(x)$ y se recuperan los $k$ fragmentos más cercanos: $\{d_{i_1},\ldots,d_{i_k}\}$.
+        \item \textbf{Generation:} el LLM genera condicionado en el query y los fragmentos: $p_\theta(\text{respuesta}| x,\,d_{i_1},\ldots,d_{i_k})$.
+    \end{enumerate}
+    RAG reduce alucinaciones al fundamentar respuestas en documentos, permite acceso a conocimiento actualizado sin re-entrenar, y permite citar fuentes.
+\end{frame}
+
+\begin{frame}{Retrieval-Augmented Generation}
+    \insertimage{rag}{1}
+\end{frame}
+
+\begin{frame}{Reflexion}
+    \textbf{Reflexion} extiende el self-refinement con \textbf{memoria persistente} entre episodios, convirtiéndolo en un comportamiento agéntico:
+    \begin{enumerate}
+        \item El agente intenta resolver la tarea.
+        \item Se evalúa el resultado mediante una señal externa (tests, feedback, verificador).
+        \item Si falla, el modelo genera una \textbf{reflexión verbal} sobre el error cometido.
+        \item La reflexión se almacena en memoria $\mathcal{M}$ y se incluye en el contexto de futuros intentos.
+    \end{enumerate}
+    A diferencia del self-refinement (un solo episodio, sin memoria), Reflexion opera a través de múltiples episodios, acumulando experiencia. Esto permite ``aprender de errores'' sin actualizar los pesos del modelo.
+\end{frame}
+
+\begin{frame}{Tool use y function calling}
+    Los LLMs pueden invocar \textbf{herramientas externas} $f_i\in\mathcal{T}$ para extender sus capacidades. El mecanismo de \textbf{function calling}:
+    \begin{enumerate}
+        \item Se definen herramientas disponibles con nombre, descripción y esquema de parámetros (provisto en el prompt del sistema).
+        \item El modelo decide si invocar una función y genera los argumentos en formato JSON.
+        \item El sistema ejecuta la función y retorna el resultado al modelo.
+    \end{enumerate}
+    \textbf{Toolformer} mostró que un LLM puede aprender autónomamente cuándo y cómo invocar herramientas, insertando llamadas a APIs en el texto generado durante el entrenamiento.
+\end{frame}
+
+\begin{frame}{ReAct}
+    \textbf{ReAct} (Reasoning + Acting) intercala razonamiento explícito y acciones en un loop:
+    \begin{enumerate}
+        \item \textbf{Thought:} el modelo razona (en texto) sobre qué hacer.
+        \item \textbf{Action:} ejecuta una acción $a_t=f_i(\text{args})$ invocando una herramienta $f_i\in\mathcal{T}$.
+        \item \textbf{Observation:} recibe el resultado $o_t$ de la acción.
+    \end{enumerate}
+    El ciclo se repite: el modelo genera el siguiente thought condicionado en todo el historial $(q,\,a_1,o_1,\ldots,a_t,o_t)$ hasta completar la tarea.
+
+    ReAct combina las ventajas de CoT (razonamiento trazable) con la capacidad de interactuar con el entorno, superando las limitaciones de ambos enfoques por separado.
+\end{frame}
+
+\begin{frame}{ReAct}
+    \insertimage{react}{0.85}
+\end{frame}
+
+\begin{frame}[fragile]{ReAct: ejemplo}
+    \footnotesize
+    \begin{verbatim}
+Question: ¿Cuál es la población de la capital de Francia?
+
+Thought: Necesito encontrar la capital de Francia.
+Action: search("capital de Francia")
+Observation: La capital de Francia es París.
+
+Thought: Ahora necesito la población de París.
+Action: search("población de París")
+Observation: París tiene aproximadamente 2.1 millones.
+
+Thought: Tengo la respuesta.
+Answer: La población de París es aprox. 2.1 millones.
+    \end{verbatim}
+\end{frame}
+
+\begin{frame}{Model Context Protocol}
+    El \textbf{MCP} es un estándar abierto para conectar LLMs con herramientas y datos de manera uniforme. Define tres roles:
+    \begin{itemize}
+        \item \textbf{Host:} la aplicación del usuario (e.g.\ VS Code, Claude Desktop). Crea y gestiona clientes MCP.
+        \item \textbf{Client:} componente dentro del host que establece una conexión 1:1 con un servidor MCP.
+        \item \textbf{Server:} proceso que expone capacidades al LLM:
+              \begin{itemize}
+                  \item \textbf{Tools:} funciones invocables (e.g.\ \texttt{search\_issues(repo, query)}).
+                  \item \textbf{Resources:} datos consultables (e.g.\ contenido de archivos).
+                  \item \textbf{Prompts:} plantillas sugeridas para tareas comunes.
+              \end{itemize}
+    \end{itemize}
+    MCP estandariza la integración ya que un servidor puede ser consumido por cualquier host compatible (similar a como USB estandarizó la conexión de periféricos).
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Introducción a las GANs.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 10: Modelos autorregresivos y LLMs (parte VI)}
+\end{frame}
+
+\end{document}
