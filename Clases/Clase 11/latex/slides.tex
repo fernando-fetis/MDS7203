@@ -1,0 +1,243 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 11: Redes generativas adversarias (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\setbeamercovered{invisible}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Revisión Tarea 1}
+
+\section{Formulación de una GAN}
+
+\begin{frame}{Idea general}
+    Una red \textbf{generativa adversaria (GAN)} es una red bayesiana de variable latente, $p_\theta(x,z)=p(z)p_\theta(x|z)$, entrenada buscando \textit{engañar} a un clasificador $q_\phi(y|x)$ que aprende a diferenciar:
+    \begin{itemize}
+        \item \textbf{Muestras reales} ($y=1$) provenientes del conjunto de entrenamiento, i.e., de la distribución $p_\text{data}(x)$.
+        \item \textbf{Muestras generadas} ($y=0$) provenientes del modelo $p_\theta(x)$.
+    \end{itemize}
+    Ambas redes se entrenan de manera adversativa, compartiendo una misma función objetivo, formando un \textbf{juego de suma cero}.
+\end{frame}
+
+\begin{frame}{Modelos probabilísticos de una GAN}
+    Una GAN considera las siguientes distribuciones:
+    \begin{itemize}
+        \item \textbf{Prior sobre el espacio latente:} $z\sim\mathcal{N}(0,\text{I}_L)$.
+        \item \textbf{Generador:} $p_\theta(x|z)=\delta_{G_\theta(z)}(x)$ (i.e., es determinista: $z\mapsto G_\theta(z)$), donde $G_\theta:\R^L\to\R^D$ es una red neuronal.
+        \item \textbf{Discriminador:} $q_\phi(y| x)\sim\text{Bernoulli}(D_\phi(x))$ es un clasificador binario, donde $D_\phi:\R^D\to[0,1]$ es una red neuronal.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Función objetivo}
+    Dada la descripción anterior, una GAN es entrenada para optimizar el siguiente problema minimax:
+    \begin{equation*}
+        \min_\theta \max_\phi
+        \mathcal{L}_\text{GAN}(\theta,\phi),
+    \end{equation*}
+    donde $\mathcal{L}_\text{GAN}(\theta,\phi)$ es la log-verosimilitud esperada del clasificador sobre una distribución conjunta $(x,y)$ formada por muestras reales y falsas:
+    \begin{equation*}
+        \mathcal{L}_\text{GAN}(\theta,\phi)
+        =\mathbb{E}_{(x,y)}\left[\log q_\phi(y|x)\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Relación con BCE}
+    Considerando que $q_\phi(y| x)\sim\text{Bernoulli}(D_\phi(x))$, entonces:
+    \begin{equation*}
+        q_\phi(y|x)=
+        \begin{cases}
+            D_\phi(x)   & \text{si } y=1 \\
+            1-D_\phi(x) & \text{si }y=0
+        \end{cases}
+        =D_\phi(x)^y \left(1-D_\phi(x)\right)^{1-y},
+    \end{equation*}
+    por lo que la log-verosimilitud del clasificador es
+    \begin{equation*}
+        \log q_\phi(y|x)=y\log D_\phi(x)+(1-y)\log\left(1-D_\phi(x)\right),
+    \end{equation*}
+    donde se reconoce la \textbf{entropía cruzada binaria} entre las etiquetas reales y las predicciones del clasificador. Luego:
+    \begin{equation*}
+        \mathcal{L}_\text{GAN}(\theta,\phi)
+        =-\,\mathbb{E}_{x}\left[\text{CE}\left(p(y|x),\,q_\phi(y|x)\right)\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Función de pérdida}
+    Una GAN es entrenada utilizando una combinación (mixtura) de imágenes reales ($y=1$) e imágenes generadas ($y=0$):
+    \begin{equation*}
+        (x,y) \sim \frac{1}{2}\left(p_\text{data}(x)\,\delta_1(y)+p_\theta(x)\,\delta_0(y)\right)
+    \end{equation*}
+    Por lo tanto:
+    \begin{align*}
+        \mathcal{L}_\text{GAN}(\theta,\phi)
+         & =\mathbb{E}_{(x,y)}\left[\log q_\phi(y|x)\right]                                                                                                       \\
+         & =\frac{1}{2}\left(\mathbb{E}_{p_\text{data}(x)}\left[\log D_\phi(x)\right]
+        + \mathbb{E}_{p_\theta(x)}\left[\log (1-D_\phi(x))\right]\right)                                                                                          \\
+         & =\frac{1}{2}\left(\mathbb{E}_{p_\text{data}(x)}\left[\log D_\phi(x)\right]+\mathbb{E}_{p(z)}\left[\log\left(1-D_\phi(G_\theta(z))\right)\right]\right)
+    \end{align*}
+    donde se usó que $p_\theta(x|z)\sim\delta_{G_\theta(z)}(x)$ para $z\sim p(z)$.
+\end{frame}
+
+\begin{frame}{Función de pérdida}
+    Para efectos de implementación, ambas esperanzas se estiman con aproximaciones de Monte Carlo:
+    \begin{itemize}
+        \item $\mathbb{E}_{p_\text{data}(x)}[\cdots]$ se aproxima usando un conjunto de entrenamiento i.i.d. $\mathcal{D}=\{x^1,\ldots,x^N\}\subset\R^D$ provenientes desde $p_\text{data}(x)$.
+        \item $\mathbb{E}_{p(z)}[\cdots]$ se aproxima usando muestras i.i.d. $\{z^1,\ldots,z^N\}\subset\R^L$ generadas desde $p(z)\sim\mathcal{N}(0,\text{I}_L)$.
+    \end{itemize}
+\end{frame}
+
+\section{Generación condicional}
+
+\begin{frame}{Formulación}
+    Se puede extender la formulación de una GAN para aprender distribuciones condicionales $p_\text{data}(x|c)$ mediante pares de entrenamiento de la forma $(x,c)\in\R^D\times\mathcal{C}$, donde $\mathcal{C}$ es el conjunto donde vive el factor condicionante del modelo.
+
+    En cualquiera de los casos, la red bayesiana de una \textbf{GAN condicional (CGAN)} es la siguiente:
+    \begin{equation*}
+        p_\theta(x,z|c)=p(z)p_\theta(x|c,z),
+    \end{equation*}
+    donde el hecho de seguir usando un prior latente gaussiano $p(z)\sim\mathcal{N}(0,\text{I}_L)$, permite considerar que $z\perp c$.
+\end{frame}
+
+\begin{frame}{Entrenamiento de una CGAN}
+    En general, en una GAN condicional, el generador es una red neuronal $G_\theta:\mathcal{C}\times\R^L\to\R^D$, mientras que el discriminador es una red neuronal $D_\phi:\mathcal{C}\times\R^D\to[0,1]$.
+
+    La función de pérdida adversativa, $\mathcal{L}_\text{CGAN}(\theta,\phi)$, en este caso es:
+    \begin{equation*}
+        \mathbb{E}_{p_\text{data}(x,c)}\left[\log D_\phi(c,x)\right]+\mathbb{E}_{p(z)p_\text{data}(c)}\left[\log\left(1-D_\phi(c,G_\theta(c,z))\right)\right],
+    \end{equation*}
+    donde $p_\text{data}(x,c)$ es representado por un dataset supervisado, mientras que $z\sim\mathcal{N}(0,\text{I}_L)$.
+\end{frame}
+
+\begin{frame}{Condicionamiento con etiquetas}
+    En el caso más simple, $c\in\{c_1,\ldots,c_K\}$ puede ser una \textbf{etiqueta de clase}. En este caso:
+    \begin{itemize}
+        \item Se puede utilizar una representación one-hot de cada etiqueta.
+        \item Se puede utilizar una matriz de embeddings para representar vectorialmente cada etiqueta.
+    \end{itemize}
+    En ambos casos, la representación vectorial de $c$ se concatena a la entrada de $G_\theta$ y $D_\phi$.
+\end{frame}
+
+\begin{frame}{Condicionamiento con texto}
+    También es posible considerar el caso donde $c\in\mathcal{V}^*$ es una \textbf{secuencia de tokens}. En este caso:
+    \begin{itemize}
+        \item Se puede utilizar un modelo tipo BERT (usando el token $\text{<CLS>}$) o CLIP para obtener una representación vectorial de $c$.
+        \item Además, es posible utilizar ambos modelos a la vez, lo que permite inyectar representaciones de naturaleza semántica (BERT) y visual (CLIP) dentro la arquitectura neuronal.
+        \item Otra opción posible es utilizar un mecanismo de cross attention para que el generador y el discriminador puedan acceder a la representación de cada token de la secuencia $c$.
+        \item Este último enfoque de arquitectura se usa en algunos modelos de difusión como Stable Diffusion.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Condicionamiento con imágenes}
+    Otra opción es considerar a $c$ como una \textbf{imagen}. En este caso:
+    \begin{itemize}
+        \item Se puede utilizar un modelo tipo ViT (o tipo VAE) para obtener una representación vectorial de $c$.
+        \item También es posible utilizar arquitecturas image-to-image que combinen convoluciones y convoluciones transpuestas.
+        \item La arquitectura U-Net (adaptada con mecanismos de atención) ha sido un modelo importante para modelos de imagen.
+    \end{itemize}
+\end{frame}
+
+\section{Heurísticas básicas para GANs}
+
+\begin{frame}{Dificultades del entrenamiento}
+    Una limitación característica del entrenamiento de una GAN es que es \textbf{inestable} y altamente sensible al balance entre generador y discriminador.
+
+    Por esto, la literatura de GANs ha desarrollado un conjunto de heurísticas que buscan estabilizar el entrenamiento tanto a nivel de arquitectura como de función de pérdida.
+
+    Algunas de estas heurísticas han motivado trabajos posteriores en modelos de difusión.
+\end{frame}
+
+\begin{frame}{Balance entre generador y discriminador}
+    El principal problema en el entrenamiento de una GAN es que el clasificador tiende a aprender más rápido que el generador.
+
+    Si $D_\phi$ se vuelve \textit{demasiado bueno} diferenciando muestras reales y falsas, entonces $\log(1-D_\phi(G_\theta(z)))$ se satura y $G_\theta$ deja de recibir gradientes útiles.
+
+    Se revisarán algunas heurísticas usuales para mitigar esto.
+\end{frame}
+
+\begin{frame}{Actualizaciones asimétricas}
+    Una heurística simple consiste en actualizar $G_\theta$ más veces que $D_\phi$, realizando $k>1$ steps de optimización del generador por cada step del discriminador.
+
+    Esto permite que $G_\theta$ \textit{alcance} a $D_\phi$ durante el entrenamiento, evitando que el discriminador se vuelva demasiado fuerte y deje de entregar gradientes útiles.
+\end{frame}
+
+\begin{frame}{Label smoothing}
+    Otra heurística consiste en utilizar \textbf{label smoothing} en las muestras reales. Para esto, en lugar de usar $y=1$ en la pérdida del discriminador, se suele utilizar $y=0.9$ (o un valor similar).
+
+    Esto regulariza a $D_\phi$ y evita que su salida se sature en $1$, manteniendo gradientes útiles para $G_\theta$.
+
+    Recordar que en los LLMs también se puede utilizar label smoothing, aunque por una motivación distinta (considerar que puede haber múltiples \textit{próximos tokens} posibles).
+\end{frame}
+
+\begin{frame}{Pérdida no saturante}
+    Otra observación importante es con respecto al problema de optimización original del generador:
+    \begin{equation*}
+        \min_\theta \mathbb{E}_{p(z)}\left[\log(1-D_\phi(G_\theta(z)))\right]
+    \end{equation*}
+    Notar que la función objetivo tiene gradientes muy pequeños cuando $D_\phi(G_\theta(z))\approx 0$ (i.e., al inicio del entrenamiento).
+
+    Debido a esto, en la práctica se utiliza una versión \textbf{no saturante}:
+    \begin{equation*}
+        \max_\theta \mathbb{E}_{p(z)}\left[\log D_\phi(G_\theta(z))\right],
+    \end{equation*}
+    que corresponde a la maximización de la probabilidad de que el discriminador clasifique como verdadera a una muestra generada.
+\end{frame}
+
+\begin{frame}{Modos de falla}
+    Incluso aplicando las heurísticas anteriores, el entrenamiento de una GAN puede fallar de otras maneras, por ejemplo:
+    \begin{itemize}
+        \item \textbf{Mode collapse:} el generador produce muestras de baja diversidad por quedar atrapado en una región del espacio latente que es buena engañando al discriminador.
+        \item \textbf{Vanishing gradients:} $D_\phi$ se vuelve demasiado bueno y $G_\theta$ no recibe gradientes útiles.
+    \end{itemize}
+    Esto ha motivado el desarrollo de arquitecturas y funciones de pérdida más sofisticadas como la \textbf{Wasserstein GAN}, la cual está relacionada al \textbf{transporte óptimo}. Este último campo se ha vuelto muy importante en el estudio de modelos generativos.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Arquitecturas neuronales para imágenes.
+        \item Algunas GANs clásicas.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 11: Redes generativas adversarias (parte I)}
+\end{frame}
+
+\end{document}
