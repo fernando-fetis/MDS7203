@@ -1,0 +1,281 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 13: Redes generativas adversarias (parte III)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\setbeamercovered{invisible}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Image-to-image translation}
+
+\begin{frame}{Image-to-image translation}
+    \textbf{Image-to-image translation} (I2IT) es una tarea de generación condicional donde, dada una imagen $x\in\mathcal{X}$ perteneciente un dominio, se busca generar una imagen $y\in\mathcal{Y}$ (en otro dominio) que preserve la estructura de $x$ pero con apariencia de $\mathcal{Y}$.
+    \insertimage{i2it}{1}
+    Se verán dos enfoques basados en GANs.
+\end{frame}
+
+\begin{frame}{Pix2Pix | Formulación}
+    Dado un dataset de pares de entrenamiento,
+    \begin{equation*}
+        \mathcal{D}=\{(x^n,y^n)\}_{n=1}^N\sim p_\text{data}(x,y),
+    \end{equation*}
+    con $x\in\mathcal{X}$ la imagen de entrada e $y\in\mathcal{Y}$ su imagen target, \textbf{Pix2Pix} aborda el problema de I2IT utilizando una CGAN que penaliza la distancia entre la imagen generada y la target:
+    \begin{align*}
+        \mathcal{L}_\text{pix2pix}(\theta,\phi) =\; &
+        \mathbb{E}_{p(x)\,p_\text{data}(y|x)}\!\left[\log D_\phi(x,y)\right]                                                                    \\
+        +\;                                         & \mathbb{E}_{p(x)\,p(z)}\!\left[\log\bigl(1-D_\phi(x,G_\theta(x,z))\bigr)\right]           \\
+        +\;                                         & \lambda\,\mathbb{E}_{p(x)\,p_\text{data}(y|x)\,p(z)}\!\left[\|y-G_\theta(x,z)\|_1\right].
+    \end{align*}
+\end{frame}
+
+\begin{frame}{Pix2Pix | Formulación}
+    \insertimage{pix2pix_cgan}{1}
+\end{frame}
+
+\begin{frame}{Pix2Pix | Arquitecturas}
+    Las arquitecturas utilizadas por Pix2Pix son las siguientes:
+    \begin{itemize}
+        \item \textbf{Generador:} U-Net. Permite preservar información fina de la imagen; necesario para tareas donde la entrada y salida están alineadas.
+        \item \textbf{Discriminador:} PatchGAN. Clasifica como real/sintético evaluando parches individuales de la imagen. Permite capturar detalles de alta frecuencia (texturas).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{CycleGAN | Consistencia cíclica}
+    \textbf{CycleGAN} extiende Pix2Pix al caso \textbf{no supervisado}, aprendiendo una traducción bidireccional entre los dominios $\mathcal{X}$ e $\mathcal{Y}$ sin requerir pares alineados.
+
+    Para esto, CycleGAN considera dos GANs, $G_{\mathcal{X}\to \mathcal{Y}}$ y $G_{\mathcal{Y}\to \mathcal{X}}$, entrenadas simultáneamente, y agrega una restricción de \textbf{consistencia cíclica} que fuerza a los generadores a ser inversos aproximados entre sí:
+    \begin{equation*}
+        G_{\mathcal{Y}\to \mathcal{X}}(G_{\mathcal{X}\to \mathcal{Y}}(x))\approx x \qquad\text{y}\qquad G_{\mathcal{X}\to \mathcal{Y}}(G_{\mathcal{Y}\to \mathcal{X}}(y))\approx y.
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{CycleGAN | Consistencia cíclica}
+    \insertimage{consistency_x}{0.85}
+    \insertimage{consistency_y}{0.85}
+\end{frame}
+
+\begin{frame}{CycleGAN | Función objetivo}
+    Para inducir esta condición, la \textbf{cycle-consistency loss} penaliza el error absoluto de las discrepancias:
+    \begin{align*}
+        \mathcal{L}_\text{cyc} =\; & \mathbb{E}_{p_\text{data}(x)}\!\left[\|G_{\mathcal{Y}\to \mathcal{X}}(G_{\mathcal{X}\to \mathcal{Y}}(x))-x\|_1\right]  \\
+        +\;                        & \mathbb{E}_{p_\text{data}(y)}\!\left[\|G_{\mathcal{X}\to \mathcal{Y}}(G_{\mathcal{Y}\to \mathcal{X}}(y))-y\|_1\right].
+    \end{align*}
+    De esta forma, la función objetivo de CycleGAN combina las dos pérdidas adversariales y el término de consistencia cíclica:
+    \begin{equation*}
+        \mathcal{L}_\text{CycleGAN} = \mathcal{L}_\text{GAN}(G_{\mathcal{X}\to \mathcal{Y}},D_{\mathcal{Y}}) + \mathcal{L}_\text{GAN}(G_{\mathcal{Y}\to \mathcal{X}},D_{\mathcal{X}}) + \lambda\,\mathcal{L}_\text{cyc},
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{CycleGAN | Reconstrucción}
+    \insertimage{cyclegan_reconstruction}{1}
+\end{frame}
+
+\section{Propiedades de las GANs}
+
+\begin{frame}{Relación con la divergencia de Jensen-Shannon}
+    El problema de optimización estándar de una GAN es
+    \begin{equation*}
+        \min_\theta \max_\phi \mathcal{L}_\text{GAN}(\theta,\phi) = \mathbb{E}_{p_\text{data}}[\log D_\phi(x)] + \mathbb{E}_{p_\theta}[\log(1-D_\phi(x))].
+    \end{equation*}
+    Para un generador $G_\theta$ fijo, el discriminador óptimo asociado es
+    \begin{equation*}
+        D_{\phi^*}(x) = \frac{p_\text{data}(x)}{p_\text{data}(x)+p_\theta(x)}.
+    \end{equation*}
+    Luego, sustituyendo $D_{\phi^*}$, la pérdida del generador se reduce a
+    \begin{equation*}
+        \mathcal{L}_\text{GAN}(\theta,\phi^*) = 2\,\mathrm{JSD}(p_\text{data}\,\|\,p_\theta) -\log 4.
+    \end{equation*}
+    Es decir, el problema minimax de una GAN \textit{equivale} al problema $\min_\theta \mathrm{JSD}(p_\text{data}\|p_\theta):=\text{D}_{\text{KL}}\left(p_\text{data}\| \frac{p_\text{data}+p_\theta}{2}\right) + \text{D}_{\text{KL}}\left(p_\theta\| \frac{p_\text{data}+p_\theta}{2}\right)$.
+\end{frame}
+
+\begin{frame}{Limitaciones de las GANs}
+    \begin{itemize}
+        \item El generador concentra masa en unas pocas modas de $p_\text{data}$, perdiendo diversidad (\textbf{mode collapse}).
+        \item Si los soportes de $p_\text{data}$ y $p_\theta$ son disjuntos, entonces $\mathrm{JSD}(p_\text{data}\|p_\theta)$ es constante, por lo que su gradiente con respecto a $\theta$ es nulo.
+        \item El problema minimax es no convexo/cóncavo, por lo que el entrenamiento usualmente es inestable.
+        \item La pérdida del discriminador no mide la calidad del generador, lo que dificulta el monitoreo y la comparación de modelos.
+    \end{itemize}
+\end{frame}
+
+\section{Distancia de Wasserstein}
+
+\begin{frame}{Earth mover problem}
+    El problema de \textbf{transporte óptimo} consiste en trasladar de forma eficiente el cobre producido por $N$ minas (cada mina ubicada en un punto $x_n\in\R^2$ y produciendo $p_n$ toneladas) a $M$ fábricas (cada una ubicada en $y_m\in\R^2$ y con demanda de $q_m$ toneladas):
+    \begin{equation*}
+        \min_{\gamma\in\Pi(p,q)} \sum_{n=1}^N\sum_{m=1}^M \gamma_{nm}c(x_n,y_m),
+    \end{equation*}
+    donde $c(x_n,y_m)$ es el costo de transportar una unidad de cobre desde la mina $n$ hasta la fábrica $m$.
+
+    $\Pi(p,q)=\{\gamma\in\mathcal{M}_{N,M}(\R):\sum_{m=1}^M \gamma_{nm}=p_n,\sum_{n=1}^N \gamma_{nm}=q_m\}$ es el conjunto de \textbf{planes de transporte} (matrices) factibles.
+\end{frame}
+
+\begin{frame}{Earth mover problem}
+    \insertimage{kantorovich_discrete_solution}{0.6}
+\end{frame}
+
+\begin{frame}{Extensión a distribuciones de probabilidad}
+    Normalizando la producción y demanda a 1, el problema de transporte óptimo se puede reformular y extender a un problema de transporte entre distribuciones de probabilidad.
+
+    En este contexto, el problema anterior se llama \textbf{problema de Kantorovich}, y su solución resulta ser una \textbf{métrica} sobre (un subconjunto de) el espacio de distribuciones de probabilidad, conocida como \textbf{distancia de Wasserstein}.
+
+    Más aún, esta métrica tiene buenas propiedades que hacen que la minimización de $W_p(p_\text{data},p_\theta)$ sea adecuada para entrenar y evaluar modelos generativos.
+\end{frame}
+
+\begin{frame}{Extensión a distribuciones de probabilidad}
+    \insertimage{couplings}{1}
+\end{frame}
+
+\begin{frame}{Definición}
+    La \textbf{distancia de Wasserstein} (de orden $p$) entre dos distribuciones de probabilidad, $\mu,\nu\in\mathcal{P}(\R^D)$, se define como
+    \begin{equation*}
+        W_p(\mu,\nu) := \left(\inf_{\gamma\in\Pi(\mu,\nu)}\mathbb{E}_{(x,y)\sim\gamma}\bigl[\|x-y\|^p\bigr]\right)^{1/p},
+    \end{equation*}
+    donde $\Pi(\mu,\nu)\subset\mathcal{P}(\R^D\times\R^D)$ es el conjunto de distribuciones conjuntas con marginales $\mu$ y $\nu$.
+
+    El caso $p=2$ se conoce como \textbf{distancia de Fréchet} (se utiliza en el cálculo de la FID), mientras que el caso $p=1$ se conoce como \textbf{distancia de Kantorovich-Rubinstein} (se utiliza en WGAN).
+\end{frame}
+
+\begin{frame}{Propiedades}
+    La distancia de Wasserstein $W_p$ tiene buenas propiedades:
+    \begin{itemize}
+        \item Está consciente de la geometría del espacio subyacente donde están definidas las distribuciones de probabilidad.
+        \item Bajo ciertas condiciones, la función $\theta\mapsto W_p(p_\text{data},p_\theta)$ es continua y diferenciable.
+        \item A diferencia de la KL o la JSD, proporciona gradientes informativos incluso cuando los soportes de $p_\text{data}$ y $p_\theta$ son disjuntos.
+        \item Es equivalente a una noción de convergencia importante en teoría de la probabilidad. En particular, está muy estudiada.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Extensión a distribuciones de probabilidad}
+    \insertimage{wasserstein_interpolation}{1}
+\end{frame}
+
+\begin{frame}{Wasserstein GAN}
+    Para el caso $p=1$ es posible obtener una \textbf{formulación dual} del problema de transporte óptimo:
+    \begin{equation*}
+        W_1(\mu,\nu) = \sup_{\|f\|_L\leq 1}\,\mathbb{E}_{x\sim\mu}[f(x)] - \mathbb{E}_{x\sim\nu}[f(x)],
+    \end{equation*}
+    donde el supremo es sobre funciones $1$-Lipschitz.
+
+    Notar que la función objetivo es similar a la que se optimiza en una GAN, por lo que se puede optimizar $W_1$ de forma análoga.
+
+    El modelo \textbf{Wasserstein GAN} (WGAN) aprovecha esta conexión para entrenar una GAN que minimice directamente $W_1(p_\text{data},p_\theta)$ en vez de la JSD.
+\end{frame}
+
+\begin{frame}{Wasserstein GAN}
+    Dada la dualidad de Kantorovich-Rubinstein,
+    \begin{equation*}
+        W_1(p_\text{data},p_\theta) = \sup_{\|f\|_L\leq 1}\,\mathbb{E}_{x\sim p_\text{data}}[f(x)] - \mathbb{E}_{x\sim p_\theta}[f(x)],
+    \end{equation*}
+    la WGAN parametriza $f$ con un \textbf{crítico} $D_\phi:\R^D\to\R$ que se entrena en conjunto con un generador $G_\theta:\R^L\to\R^D$ mediante
+    \begin{equation*}
+        \min_\theta \max_\phi \mathcal{L}_{WGAN}(\theta,\phi)   = \mathbb{E}_{p_\text{data}}[D_\phi(x)] - \mathbb{E}_{p(z)}[D_\phi(G_\theta(z))]
+    \end{equation*}
+    En cambio, la condición $\|D_\phi\|_L\leq 1$ se impone mediante técnicas como \textbf{weight clipping} o \textbf{penalización de gradiente}.
+\end{frame}
+
+\begin{frame}{Wasserstein GAN}
+    Se tienen las siguientes observaciones:
+    \begin{itemize}
+        \item El crítico $D_\phi$ ya no entrega una probabilidad, sino que es una función de puntuación que asigna valores altos a muestras reales y bajos a muestras sintéticas.
+        \item El entrenamiento de WGAN es más estable que el de una GAN estándar. Además, el valor de la función objetivo correlaciona bien con la calidad de las muestras, sirviendo como una métrica de monitoreo útil.
+        \item En general, siempre es preferible minimizar $W_1(p_\text{data},p_\theta)$ sobre minimizar, por ejemplo, la KL. Sin embargo, a diferencia de la KL, $W_p$ suele ser difícil de computar.
+    \end{itemize}
+\end{frame}
+
+\section{Métricas de evaluación}
+
+\begin{frame}{Inception Score}
+    El \textbf{inception score} (IS) es una métrica de evaluación para generación de imágenes que utiliza una CNN \textbf{Inception} preentrenada como un clasificador $x\mapsto p(y|x)$ sobre ImageNet.
+
+    IS se basa en dos criterios:
+    \begin{itemize}
+        \item \textbf{Reconocibilidad:} la distribución $p(y|x)$ debe estar concentrada en pocas clases. Esto indica que la imagen generada es de alta calidad y pertenece a una clase específica.
+        \item \textbf{Diversidad:} la marginal $p(y)$ debe ser lo más uniforme posible. Esto indica que el modelo cubre una amplia variedad de clases, evitando el mode collapse interclase.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Inception Score}
+    Motivado por los criterios anteriores, el IS de una distribución generativa $p_\theta$ se define como la \textbf{información mútua} entre $y$ e $x$:
+    \begin{equation*}
+        \mathrm{IS}(p_\theta) := \exp\!\left(\mathbb{E}_{x\sim p_\theta}\bigl[D_\mathrm{KL}(p(y|x)\,\|\,p(y))\bigr]\right),
+    \end{equation*}
+    donde $p(y)=\mathbb{E}_{x\sim p_\theta}[p(y|x)]$ se aproxima por Monte Carlo utilizando muestras generadas desde $p_\theta$.
+
+    En consecuencia, un valor de IS alto indica que las imágenes generadas son de alta calidad y diversas.
+
+    La limitación principal de IS es que evalúa $p_\theta$ sin considerar $p_\text{data}$ en su evaluación.
+\end{frame}
+
+\begin{frame}{Fréchet Inception Distance}
+    La \textbf{Fréchet inception distance} (FID) compara las distribuciones $p_\text{data}$ y $p_\theta$ mediante la distribución de sus \textbf{feature maps} respectivos obtenidos a partir de Inception. Para esto:
+    \begin{itemize}
+        \item Para cada imagen $x$ (real o sintética) se extraen sus feature maps $\varphi(x)$ utilizando Inception.
+        \item Por conveniencia, se asume que ambas distribuciones de features son gaussianas: $p_\text{data}(\varphi)\approx\mathcal{N}(\mu_r,\Sigma_r)$ y $p_\theta(\varphi)\approx\mathcal{N}(\mu_g,\Sigma_g)$.
+        \item Se estiman los parámetros de las gaussianas por MLE.
+        \item Finalmente, se calcula la distancia de Fréchet entre ambas gaussianas, la cual tiene una forma cerrada.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Fréchet Inception Distance}
+
+    Considerando la fórmula de la distancia de Fréchet entre gaussianas, la FID puede calcularse de forma eficiente como
+    \begin{align*}
+        \mathrm{FID}(p_\text{data}, p_\theta)^2
+        := & W_2^2\bigl(\mathcal{N}(\mu_r,\Sigma_r),\mathcal{N}(\mu_g,\Sigma_g)\bigr)                       \\
+        =  & \|\mu_r-\mu_g\|_2^2 + \mathrm{tr}\!\left(\Sigma_r+\Sigma_g - 2(\Sigma_r\Sigma_g)^{1/2}\right).
+    \end{align*}
+    Valores de FID bajos indican mayor similitud perceptual con los datos reales.
+
+    En general, se suele considerar que FID es la métrica estándar para comparar modelos generativos de imágenes. Sin embargo, la suposición gaussiana es falsa en general, y además combina calidad y diversidad en un único escalar.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Autoencoders clásicos.
+        \item Introducción a los autoencoders variacionales.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 13: Redes generativas adversarias (parte III)}
+\end{frame}
+
+\end{document}
