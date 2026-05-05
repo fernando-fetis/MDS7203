@@ -1,0 +1,143 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 14: Autoencoders variacionales (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Autoencoders clásicos}
+
+\begin{frame}{Autoencoder clásico}
+    Un \textbf{autoencoder (AE)} es una red neuronal utilizada para aprender representaciones \textit{eficientes} de una distribución de datos.
+
+    Un AE está compuesto por dos partes:
+    \begin{itemize}
+        \item \textbf{Encoder:} red neuronal $E_\phi:\R^D\mapsto\R^L$ que mapea los datos a un espacio de menor dimensión ($L\ll D$).
+        \item \textbf{Decoder:} red neuronal $D_\theta:\R^L\mapsto\R^D$ que reconstruye los datos originales a partir de la representación comprimida.
+    \end{itemize}
+    Por lo que un AE es una función $f_{\phi,\theta}:\R^D\to\R^D$ que compone ambas redes neuronales:
+    \begin{align*}
+        f_{\phi,\theta}(x) & = (D_\theta\circ E_\phi)(x) \\
+                           & = D_\theta(E_\phi(x))
+    \end{align*}
+\end{frame}
+
+\begin{frame}{Entrenamiento y aplicaciones}
+    Para el entrenamiento, es usual minimizar el \textbf{error cuadrático medio (MSE) de reconstrucción} sobre un conjunto de datos de entrenamiento, $\mathcal{D}=\{x^1,\ldots,x^N\}\subset\R^D$:
+    \begin{equation*}
+        \min_{\phi,\theta} \mathcal{L}_{\text{MSE}}(\phi,\theta),
+        \quad\text{donde}\quad
+        \mathcal{L}_{\text{MSE}}(\phi,\theta) = \frac{1}{N}\sum_{n=1}^N \left\|x^n - D_\theta(E_\phi(x^n))\right\|^2
+    \end{equation*}
+    Un AE entrenado se puede utilizar para diversas tareas:
+    \begin{itemize}
+        \item Reducción de dimensionalidad.
+        \item Detección de anomalías.
+        \item ¿Generación de datos?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Tipos de autoencoders}
+    Existen varias variantes de la formulación anterior, por ejemplo:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item \textbf{Sparse autoencoder (SAE):} considera $L>D$ e incentiva una representación sparse.
+        \item \textbf{Denoising autoencoder (DAE):} corrompe los datos con ruido y entrena al AE para que reconstruya los datos originales.
+        \item \textbf{Contractive autoencoder (CAE):} regulariza la función objetivo para que el encoder sea robusto a pequeñas perturbaciones en los datos de entrada.
+        \item \textbf{Variational autoencoder (VAE):} modela probabilísticamente el espacio latente y el proceso de generación de datos.
+    \end{itemize}
+    Este curso está enfocado en los VAEs ya que su formulación probabilística los transforma en \textbf{modelos generativos}.
+\end{frame}
+
+\section{Introducción a los VAEs}
+
+\begin{frame}{Formulación de un VAE}
+    Dada una red bayesiana de variable latente, $p_\theta(x,z)=p_\theta(z)p_\theta(x|z)$, sabemos que la marginal $p_\theta(x)=\int_{\R^L} p_\theta(x,z)\,\text{d}z$ es intratable en la práctica, por lo que no es posible entrenar el modelo directamente mediante máxima verosimilitud.
+
+    Las GANs abordan este problema utilizando un discriminador auxiliar (\textbf{verosimilitud implícita}), mientras que los VAEs lo hacen mediante inferencia variacional (\textbf{verosimilitud aproximada}).
+
+    Para esto, notar que $p_\theta(x)$ se puede escribir como
+    \begin{equation*}
+        p_\theta(x,z)=p_\theta(z|x)p_\theta(x)\implies p_\theta(x)=\frac{p_\theta(x,z)}{p_\theta(z|x)}
+    \end{equation*}
+    Por lo tanto, se puede usar una segunda red neuronal para aprender una distribución $q_\phi(z|x)$ que estime la posterior $p_\theta(z|x)$.
+\end{frame}
+
+\begin{frame}{Evidence lower bound (ELBO)}
+    Un VAE entrena la red neuronal del \textbf{decoder} $p_\theta(x|z)$ y del \textbf{encoder} $q_\phi(z|x)$ usando un conjunto de entrenamiento $\mathcal{D}\subset\R^D$:
+    \begin{equation*}
+        \max_{\theta,\phi} \frac{1}{|\mathcal{D}|}\sum_{x\in\mathcal{D}} \operatorname{ELBO}(x),
+    \end{equation*}
+    donde $\operatorname{ELBO}(x)\in\R$ es la siguiente función objetivo \textit{natural}:
+    \begin{equation*}
+        \operatorname{ELBO}(x):=\log p_\theta(x)-\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z|x)\right)
+    \end{equation*}
+    Recordar que la divergencia de Kullback-Leibler entre dos distribuciones $p$ y $q$ es la cantidad
+    \begin{equation*}
+        \operatorname{D_{KL}}(p\|q):=\mathbb{E}_{p(z)}\left[\log\left(\frac{p(z)}{q(z)}\right)\right]
+        = \int_{\R^L} \log\left(\frac{p(z)}{q(z)}\right)p(z)\,\text{d}z
+    \end{equation*}
+
+    Además, dado que esta divergencia es no negativa, se tiene que $\operatorname{ELBO}(x)\leq \log p_\theta(x)$, lo que justifica el nombre \textit{ELBO}.
+\end{frame}
+
+\begin{frame}{ELBO}
+    Si bien la log-verosimilitud $\log p_\theta(x)$ no es tratable, la ELBO se puede reordenar para obtener una forma tratable, lo que permite entrenar las redes neuronales eficientemente:
+
+    \begin{equation*}
+        \operatorname{ELBO}(x) = \underbrace{\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]}_{\text{término de reconstrucción}} - \underbrace{\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)}_{\text{prior matching}}
+    \end{equation*}
+
+
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Reformulación de la ELBO.
+        \item Implementación continua y discreta.
+        \item Interpolación en el espacio latente.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 14: Autoencoders variacionales (parte I)}
+\end{frame}
+
+\end{document}
