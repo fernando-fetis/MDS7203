@@ -1,0 +1,179 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 15: Autoencoders variacionales (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Recuerdo clase anterior}
+
+\begin{frame}{VAE y ELBO}
+    Un \textbf{VAE} es un modelo de variable latente $p_\theta(x,z)=p_\theta(z)p_\theta(x|z)$, el cual utiliza un segundo modelo auxiliar, $q_\phi(z|x)$ para aproximar la posterior intractable $p_\theta(z|x)$.
+
+    Un VAE se entrena maximizando la \textbf{ELBO} media sobre un conjunto de datos de entrenamiento, $\mathcal{D}=\{x^1,\ldots,x^N\}\subset\R^D$:
+    \begin{equation*}
+        \max_{\theta,\phi} \frac{1}{N}\sum_{n=1}^N \operatorname{ELBO}(x^n),
+    \end{equation*}
+    donde la \textit{Evidence Lower BOund} se define como
+    \begin{equation*}
+        \operatorname{ELBO}(x):=\log p_\theta(x)-\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z|x)\right)
+    \end{equation*}
+    Notar que $\operatorname{ELBO}(x) \leq \log p_\theta(x)$, lo que justifica su nombre.
+\end{frame}
+
+\begin{frame}{Forma equivalente para la ELBO}
+    La ELBO es una función objetivo natural. Sin embargo, su forma original no es tratable debido a los términos $p_\theta(x)$ y $p_\theta(z|x)$.
+
+    Se pueden reordenar los términos de la ELBO para obtener la siguiente forma equivalente:
+    \begin{equation*}
+        \operatorname{ELBO}(x) = \underbrace{\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]}_{\text{término de reconstrucción}} - \underbrace{\operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)}_{\text{prior matching}}
+    \end{equation*}
+    En esta forma alternativa, la ELBO se puede calcular de forma eficiente si se eligen distribuciones adecuada.
+\end{frame}
+
+\section{ELBO en un VAE}
+
+\begin{frame}{Familas de distribuciones}
+    La reformulación de la ELBO sugiere realizar la siguiente elección de distribuciones para hacer esta cantidad tratable:
+    \begin{itemize}
+        \item \textbf{Prior latente:} $p_\theta(z) \sim \mathcal{N}( 0, \operatorname{I}_L)$.
+        \item \textbf{Encoder:} $q_\phi(z|x) \sim \mathcal{N}(\mu_\phi(x), \operatorname{diag}(\sigma^2_\phi(x)))$, donde $\mu_\phi:\R^D\to\R^L$ y $\sigma_\phi:\R^D\to\R^L_{++}$ son redes neuronales.
+        \item \textbf{Decoder:} dependerá de la naturaleza de los datos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Prior matching}
+    Dadas dos distribuciones gaussianas en $\R^L$, su divergencia de Kullback-Leibler tiene forma cerrada:
+    \begin{align*}
+         & \operatorname{D_{KL}}\left(\mathcal{N}(\mu_1,\Sigma_1)\|\mathcal{N}(\mu_2,\Sigma_2)\right)                                                               \\
+         & = \frac{1}{2}\left[(\mu_1-\mu_2)^\top\Sigma_2^{-1}(\mu_1-\mu_2) + \operatorname{traza}(\Sigma_1\Sigma_2^{-1})-L-\log|\det(\Sigma_1\Sigma_2^{-1})|\right]
+    \end{align*}
+    Dado que $q_\phi(z|x)\sim\mathcal{N}\left(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))\right)$ y $p_\theta(z)\sim\mathcal{N}(0, \operatorname{I}_L)$, se tiene una forma cerrada para el término de \textbf{prior matching}:
+    \begin{align*}
+         & \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right)                                                               \\
+         & = \frac{1}{2}\left(\|\mu_\phi(x)\|^2 + \|\sigma_\phi(x)\|^2 \right) - \sum_{l=1}^L \log \sigma_\phi(x)_l + \text{constante}
+    \end{align*}
+\end{frame}
+
+\begin{frame}{Término de reconstrucción | Reparametrización}
+    Dado que $q_\phi(z|x)\sim\mathcal{N}\left(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))\right)$, esta v.a. se puede reparametrizar usando el cambio de variable
+    \begin{equation*}
+        z=\mu_\phi(x)+\sigma_\phi\odot \epsilon,
+        \quad\text{con}\quad
+        \epsilon\sim\mathcal{N}(0,\operatorname{I}_L)
+    \end{equation*}
+    Luego, el \textbf{término de reconstrucción} se puede escribir como
+    \begin{equation*}
+        \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] =
+        \mathbb{E}_{\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)}\left[\log p_\theta(x|\mu_\phi(x)+\sigma_\phi\odot \epsilon)\right]
+    \end{equation*}
+    Esta esperanza se puede aproximar usando Monte Carlo:
+    \begin{equation*}
+        \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] \approx \frac{1}{K} \sum_{k=1}^K \log p_\theta(x|\tilde z^k),
+    \end{equation*}
+    donde $\tilde z^k=\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon_k$, con  $\epsilon_k\sim\mathcal{N}(0,\operatorname{I}_L)$.
+\end{frame}
+
+\begin{frame}{Término de reconstrucción | Caso gaussiano}
+    si los datos en $p_\text{data}(x)$ son de naturaleza continua, es usual considerar una distribución gaussiana:
+    \begin{equation*}
+        p_\theta(x|z) \sim \mathcal{N}(\mu_\theta(z), \sigma^2_0\operatorname{I}_D),
+    \end{equation*}
+    donde $\mu_\theta:\R^L\to\R^D$ es una red neuronal, y $\sigma_0^2>0$ es un hiperparámetro. En este caso:
+    \begin{equation*}
+        p_\theta(x|z)=\frac{1}{\sqrt{(2\pi\sigma_0^2)^D}}\exp\left(-\frac{1}{2\sigma_0^2}\|x-\mu_\theta(z)\|^2\right)
+    \end{equation*}
+    Por lo tanto, la log-densidad del término de reconstrucción se reduce a algo similar a la función objetivo de un AE clásico:
+    \begin{equation*}
+        \log p_\theta(x|z)=-\frac{1}{2\sigma_0^2}\|x-\mu_\theta(z)\|^2 + \text{constante}
+    \end{equation*}
+\end{frame}
+
+
+\begin{frame}{Término de reconstrucción | Caso discreto}
+    Si $p_\text{data}(x)$ es una distribución definida sobre imágenes, cada pixel se puede modelar como $p_\theta(x_d|z)\sim \text{Bernoulli}\left(r_d\right)$, donde $r_\theta(z)=(r_1,\ldots,r_D)\in[0,1]^D$ es la salida de una red neuronal $r_\theta:\R^L\to\R^D$.
+
+    Con esto, la distribución que se asocia al decoder es
+    \begin{align*}
+        \log p_\theta(x|z)
+         & = \sum_{d=1}^D \log p_\theta(x_d|z)                                     \\
+         & = \sum_{d=1}^D \left(x_d\cdot\log r_d + (1-x_d)\cdot\log(1-r_d)\right)
+    \end{align*}
+\end{frame}
+
+\section{Interpolación y VAE condicional}
+
+\begin{frame}{Interpolación en el espacio latente}
+
+    A diferencia de la interpolación en el espacio de las imágenes, $x_t=(1-t)x_0+tx_1$, la interpolación en latente, $z_t=(1-t)z_0+tz_1$, suele tener mayor sentido semántico.
+
+    Una GAN permite este tipo de interpolación semántica mediante $x_t=\operatorname{generador}(z_t)\in\R^D$. Sin embargo, solo es posible si se conocen las representaciones latentes $z_0,z_1\in\R^L$.
+
+    Un VAE permite obtener estas representaciones latentes de dos muestras $x_0,x_1\in\R^D$ utilizando el encoder $q_\phi(z|x)$:
+    \begin{equation*}
+        z_t=(1-t)\operatorname{encoder}(x_0)+t\operatorname{encoder}(x_1)
+    \end{equation*}
+    De este modo, $x_t=\operatorname{decoder}(z_t)\in\R^D$ es una muestra interpolada linealmente pero en el espacio latente del VAE.
+\end{frame}
+
+\begin{frame}{VAE condicional}
+    Al igual que toda red bayesiana, se puede extender la formulación original de un VAE a su \textbf{versión condicional}.
+
+    Si $y\sim p(y)$ es un factor condicionante (p.g. etiqueta o descripción), entonces un VAE puede aprender una distribución $p_\theta(x|y)$:
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item \textbf{Encoder:} $q_\phi(z|x,y)$.
+        \item \textbf{Decoder:} $p_\theta(x|z,y)$.
+        \item \textbf{Prior:} $p(z|y)=p(z)$ (considerando $z\perp y$).
+    \end{itemize}
+    Los parámetros de estas distribuciones son aprendidas por dos redes neuronales que ahora reciben $y$ como entrada adicional.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Implementación de un VAE para CelebA.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 15: Autoencoders variacionales (parte II)}
+\end{frame}
+
+\end{document}
