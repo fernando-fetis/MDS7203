@@ -1,0 +1,58 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº4}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Redes generativas adversarias}
+\begin{enumerate}[{\bf P1.}]
+	\item ¿Cuál es la diferencia principal entre Pix2Pix y CycleGAN? ¿Qué ventaja tiene CycleGAN sobre Pix2Pix?
+
+	\item ¿A qué se denomina colapso a la moda en el entrenamiento de una GAN? Explique por qué ocurre y cómo afecta a la distribución generada.
+
+	\item La métrica FID (Fréchet Inception Distance) es el estándar para comparar modelos generativos de imágenes. Describa brevemente cómo se calcula: qué red neuronal se usa, qué se extrae de ella y cómo se comparan las distribuciones de datos reales y generados.
+\end{enumerate}
+
+\section*{Autoencoders variacionales}
+\begin{enumerate}[{\bf P1.}]
+	\item ¿Qué diferencia fundamental existe entre un autoencoder clásico y un autoencoder variacional (VAE)? En particular, explique cómo difieren en la naturaleza del espacio latente y en la forma en que se entrena cada modelo.
+
+	\item La función objetivo de un VAE es la ELBO, cuya forma tratable es la siguiente:
+	\begin{equation*}
+		\operatorname{ELBO}(x)
+		= \underbrace{\mathbb{E}_{q_\phi(z|x)}\!\left[\log p_\theta(x|z)\right]}_{\text{término de reconstrucción}}
+		- \underbrace{\operatorname{D_{KL}}\!\left(q_\phi(z|x)\,\|\,p_\theta(z)\right)}_{\text{prior matching}}
+	\end{equation*}
+	Interprete cada uno de los dos términos.
+\end{enumerate}
+
+\end{document}
