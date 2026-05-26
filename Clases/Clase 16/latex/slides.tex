@@ -1,0 +1,136 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 16: Autoencoders variacionales (parte III)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Recuerdo previo}
+
+\begin{frame}{Distribuciones del VAE}
+    Un VAE define un \textbf{encoder} $q_\phi(z|x) \sim \mathcal{N}(\mu_\phi(x), \operatorname{diag}(\sigma^2_\phi(x)))$, un \textbf{decoder} $p_\theta(x|z)$ y un \textbf{prior} $p(z) \sim \mathcal{N}( 0, \operatorname{I}_L)$.
+
+    $p_\theta(x|z)$ depende de la naturaleza de $p_\text{data}(x)$. Si $x\in\R^D$, es una imagen, entonces se suele considerar $p_\theta(x_d|z) \sim \text{Bernoulli}(r_d)$.
+
+    Luego, considerando independencia condicional de los pixeles:
+    \begin{align*}
+        \log p_\theta(x|z) & = \sum_{d=1}^D \left(x_d\cdot\log r_d + (1-x_d)\cdot\log(1-r_d)\right) \\
+                           & = \operatorname{BCE}(x, r_\theta(z))
+    \end{align*}
+    Aquí, $r_\theta(z)=(r_1,\ldots,r_D)\in[0,1]^D$ es la salida de una red neuronal con activación sigmoidal.
+\end{frame}
+
+\begin{frame}{ELBO}
+    Para el entrenamiento del encoder y del decoder se maximiza la \textbf{ELBO} esperada sobre un conjunto de datos de entrenamiento:
+    \begin{equation*}
+        \operatorname{ELBO}(x) = \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right] - \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p(z)\right)
+    \end{equation*}
+    Desarrollando cada término, se obtiene:
+    \begin{align*}
+        \mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]       & = \mathbb{E}_{\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)}\left[\log p_\theta(x|\mu_\phi(x)+\sigma_\phi\odot \epsilon)\right] \\
+        \operatorname{{D}_{KL}}\left(q_\phi(z|x)\| p_\theta(z)\right) & = \frac{1}{2}\left(\|\mu_\phi(x)\|^2 + \|\sigma_\phi(x)\|^2 \right) - \sum_{l=1}^L \log \sigma_\phi(x)_l + \text{cte.}
+    \end{align*}
+    Para la generación, se realiza \textbf{ancestral sampling}, generando desde $z\sim p(z)$ y luego desde $x\sim p_\theta(x|z)$.
+\end{frame}
+
+\section{Manipulación de atributos}
+
+\begin{frame}{Idea general}
+    La continuidad del espacio latente permite modificar la intensidad de algún atributo de una muestra:
+    \insertimage{attribute_modification}{0.9}
+\end{frame}
+
+\begin{frame}{Métodología}
+    Si $\mathcal{X}^+\subset\R^D$ es un conjunto de muestras que poseen el atributo que se busca modificar y $\mathcal{X}^-\subset\R^D$ un conjunto de muestras que no lo poseen, entonces se pueden considerar los \textbf{centroides}
+    \begin{equation*}
+        z^+=\frac{1}{|\mathcal{X}^+|}\sum_{x\in\mathcal{X}^+} \text{encoder}(x),
+        \qquad
+        z^-=\frac{1}{|\mathcal{X}^-|}\sum_{x\in\mathcal{X}^-} \text{encoder}(x).
+    \end{equation*}
+    $z_{\text{attr}}=z^+-z^-\in\R^L$ es una \textbf{dirección latente} asociada al atributo. Luego, para una muestra $x\in\R^D$ y una intensidad $\lambda\in\R$,
+    \begin{equation*}
+        \tilde x = \text{decoder}(\text{encoder}(x)+\lambda\, z_\text{attr}) \in\R^D
+    \end{equation*}
+    corresponde a la muestra original $x\in\R^D$ con el atributo amplificado ($\lambda>0)$ o disminuido ($\lambda<0$).
+\end{frame}
+
+\section{Truco de la reparametrización}
+
+\begin{frame}{Intercambio gradiente-esperanza}
+    Si $p(x)$ no dependa de $\theta$ (e.g. $p_\text{data}(x)$), entonces se puede realizar el intercambio $\nabla_\theta\,\mathbb{E}_{p(x)}[f_\theta(x)] = \mathbb{E}_{p(x)}[\nabla_\theta f_\theta(x)]$.
+
+    Esto permite aproximar $\nabla_\theta\,\mathbb{E}_{p(x)}\left[f_\theta(x)\right]$ a través de Monte Carlo:
+    \begin{equation*}
+        \nabla_\theta\,\mathbb{E}_{p(x)}\left[f_\theta(x)\right]\approx\frac{1}{K}\sum_{k=1}^K \nabla_\theta f_\theta(x^k),
+        \quad
+        x^1,\ldots,x^K \sim p(x)
+    \end{equation*}
+    Esto permite aproximar los gradientes que se necesitan para entrenar una red neuronal $f_\theta$ que optimiza $\mathbb{E}_{p(x)}[f_\theta(x)]$.
+
+    Sin embargo, esto no permite entrenar el encoder $q_\phi(z|x)$ de un VAE debido al término de reconstrucción, $\nabla_\phi\,\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]$.
+\end{frame}
+
+\begin{frame}{Reparametrización del encoder}
+    Considerando que $q_\phi(z|x)\sim\mathcal{N}\left(\mu_\phi(x),\operatorname{diag}(\sigma_\phi^2(x))\right)$, se puede reparametrizar $q_\phi(z|x)$ usando el \textbf{truco de la reparametrización}:
+    \begin{equation*}
+        z=\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon,
+    \end{equation*}
+    donde $\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)$ es una v.a. que no depende de $\phi$. Luego:
+    \begin{align*}
+        \nabla_\phi\,\mathbb{E}_{q_\phi(z|x)}\left[\log p_\theta(x|z)\right]
+         & = \nabla_\phi\,\mathbb{E}_{\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)}\left[\log p_\theta(x|\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon)\right] \\
+         & = \mathbb{E}_{\epsilon\sim\mathcal{N}(0,\operatorname{I}_L)}\left[\nabla_\phi\,\log p_\theta(x|\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon)\right] \\
+         & \approx \nabla_\phi\,\log p_\theta(x|\mu_\phi(x)+\sigma_\phi(x)\odot \epsilon)
+    \end{align*}
+    En la última aproximación, se utilizó Monte Carlo considerando una única muestra $\epsilon\sim\mathcal{N}(0,\text{I}_L)$.
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Variantes del VAE.
+        \item 5º control de lectura.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 16: Autoencoders variacionales (parte III)}
+\end{frame}
+
+\end{document}
