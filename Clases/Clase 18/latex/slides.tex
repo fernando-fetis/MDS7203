@@ -1,0 +1,173 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 18: Score matching (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Recuerdo EBM}
+
+\begin{frame}{Modelos basados en energía}
+    Un EBM $p_\theta(x)\propto\exp\left(-E_\theta(x)\right)$ entrena $E_\theta:\R^D\to\R$ por máxima verosimilitud (aproximada) usando que:
+    \begin{equation*}
+        \nabla_\theta\log p_\theta(x)=\mathbb{E}_{p_\theta(x)}\left[\nabla_\theta E_\theta(x)\right]-\nabla_\theta E_\theta(x)
+    \end{equation*}
+    \vspace{-0.8cm}
+    \begin{itemize}
+        \item $\mathbb{E}_{p_\theta(x)}[\cdots]$ se estima usando Monte Carlo, donde las muestras desde $p_\theta(x)$ se generan usando \textbf{Langevin sampling}:
+              \begin{equation*}
+                  x_{t+1} = x_t+\frac{\epsilon}{2} \underbrace{\nabla_{x_t} \log p_\theta(x_t)}_{-\nabla_{x_t} E_\theta(x_t)}+\sqrt{\epsilon}\, z_t,
+                  \quad\text{donde }
+                  z_t\sim\mathcal{N}(0,\operatorname{I}_D).
+              \end{equation*}
+        \item Los gradientes $\nabla_\theta E_\theta(x)$ y $\nabla_x E_\theta(x)$ se calculan por diferenciación automática de la red neuronal $E_\theta$ que parametriza la energía.
+    \end{itemize}
+\end{frame}
+
+\section{Score matching}
+
+\begin{frame}{Motivación}
+    En la recursión del sampling de Langevin,
+    \begin{equation*}
+        x_{t+1} = x_t+\frac{\epsilon}{2} \nabla_{x_t} \log p_\theta(x_t) + \sqrt{\epsilon}\, z_t,
+    \end{equation*}
+    es necesario computar $\nabla_x \log p_\theta(x)\in\R^D$ en cada paso de la iteración, lo que vuelve costoso el entrenamiento y la generación.
+
+    Los \textbf{modelos basados en score} modelan directamente esta cantidad, denominada \textbf{score (de Stein)}, mediante una red neuronal $s_\theta:\R^D\to\R^D$ la cual es entrenada para que $s_\theta(x)\approx\nabla_x\log p_\theta(x)$.
+
+    Esto evita la diferenciación automática en la dinámica de Langevin, volviendo más eficiente el muestreo con este algoritmo.
+\end{frame}
+
+\begin{frame}{Divergencia de Fisher}
+    Notar que una función de densidad $p(x)$ define una única función de score, $s(x)=\nabla_x\log p(x)$, y viceversa:
+    \begin{equation*}
+        \text{si}\quad
+        \nabla_x \log p_1(x)=\nabla_x \log p_2(x)
+        \quad\text{entonces}\quad
+        p_1(x)=p_2(x)
+    \end{equation*}
+    En particular, entrenar un modelo de score, $s_\theta(x)$, permite recuperar la distribución del modelo $p_\theta(x)$, la cual al minimizar la divergencia se ajusta a la distribución de datos $p_{\text{data}}(x)$.
+
+    Luego, el problema de optimización natural para el entrenamiento de $s_\theta:\R^D\to\R^D$ es minimizar la siguiente \textbf{divergencia de Fisher}
+    \begin{equation*}
+        \operatorname{D_F}\left(p_{\text{data}}(x)\|p_\theta(x)\right):= \mathbb{E}_{p_{\text{data}}(x)}\left[\frac{1}{2}\left\|s_\theta(x)-\nabla_x\log p_{\text{data}}(x)\right\|^2\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Score matching}
+    El score real $s_{\text{data}}(x)=\nabla_x\log p_{\text{data}}(x)$ es desconocido, por lo que la divergencia de Fisher no es directamente computable.
+
+    Sin embargo, es posible trasladar toda la intratabilidad a una constante aditiva, dando paso a la técnica de \textbf{score matching}:
+    \begin{equation*}
+        \operatorname{D_F}\left(p_{\text{data}}(x)\|p_\theta(x)\right)= \mathbb{E}_{p_{\text{data}}(x)}\left[\frac{1}{2}\left\|s_\theta(x)\right\|^2 + \operatorname{Div}_x\left( s_\theta(x)\right)\right] + \operatorname{constante}
+    \end{equation*}
+    Por lo tanto, es posible entrenar $s_\theta(x)$ minimizando la expresión anterior, la cual no depende del score real, $s_{\text{data}}(x)$.
+
+    Para la generación de muestras, se puede usar Langevin sampling usando directamente $s_\theta(x)$ en vez de $\nabla_x\log p_\theta(x)$.
+\end{frame}
+
+\section{Denoising score matching}
+
+\begin{frame}{Denoising score matching}
+    La descomposición anterior involucra el cálculo de la divergencia $\operatorname{Div}_x(s_\theta(x)) = \sum_{d=1}^D \frac{\partial s_\theta(x)_d}{\partial x_d}$, lo cual puede ser costoso.
+
+    Un enfoque alternativo para que $\operatorname{D_F}\left(p_{\text{data}}(x)\|p_\theta(x)\right)$ sea tratable es utilizar otra distribución, $q_\sigma(\tilde x)$, que sea una versión levemente ruidosa de la distribución real, $p_{\text{data}}(x)$.
+
+    Dado $x\sim p_\text{data}(x)$, se puede elegir $q_\sigma(\tilde x| x)\sim \mathcal{N}(x,\sigma^2\operatorname{I}_D)$, con $\sigma>0$ un hiperparámetro. Con esto, su \textbf{score condicional} es:
+    \begin{equation*}
+        \nabla_{\tilde x} \log q_\sigma(\tilde x|x)=  -\frac{\tilde x-x}{\sigma^2}
+    \end{equation*}
+    Esto motiva a intentar transformar la divergencia de Fisher ruidosa, $\operatorname{D_F}\left(q_\sigma(\tilde x)\|p_\theta(\tilde x)\right)$, en una versión condicional.
+\end{frame}
+
+\begin{frame}{Denoising score matching}
+    Para $q_\sigma(\tilde x| x)\sim \mathcal{N}(x,\sigma^2\operatorname{I}_D)$ y un modelo de score $s_\theta(\tilde x)$ con distribución $p_\theta(\tilde x)$ asociada, \textbf{denoising score matching} muestra que
+    \begin{align*}
+         & \operatorname{D_F}\left(q_\sigma(\tilde x)\|p_\theta(\tilde x)\right)                            \\
+         & = \mathbb{E}_{p_{\text{data}}(x),\,q_\sigma(\tilde x|x)}\left[\frac{1}{2}\left\|
+            s_\theta(\tilde x)-\nabla_{\tilde x} \log q_\sigma(\tilde x|x)
+        \right\|^2\right] + \operatorname{constante}                                                        \\
+         & =\mathbb{E}_{p_{\text{data}}(x),\,\epsilon\sim\mathcal{N}(0,\text{I}_D)}\left[\frac{1}{2}\left\|
+            s_\theta(x+\sigma \epsilon)+\frac{\epsilon}{\sigma}
+            \right\|^2\right] + \operatorname{constante}
+    \end{align*}
+    Luego, se puede entrenar un modelo de score $s_\theta(\tilde x)$ para la distribución $q_\sigma(\tilde x) = \int_{\R^D} q_\sigma(\tilde x|x)p_{\text{data}}(x)\,\text{d}x$ de forma eficiente.
+
+    Notar que el valor de $\sigma>0$ produce un trade-off entre el grado de similitud $q_\sigma(\tilde x)\approx p_{\text{data}}(x)$ y la facilidad de entrenamiento.
+\end{frame}
+
+\begin{frame}{DSM con varios niveles de ruido}
+    El trade-off anterior puede ser evitado al considerar múltiples niveles de ruido en la técnica de DSM.
+
+    Si $(\sigma_k)_{k=1}^K\subset\R_{++}$ es una secuencia creciente de ruidos, se pueden considerar distribuciones $q_{\sigma_k}(\tilde x| x)\sim \mathcal{N}(x,\sigma_k^2\operatorname{I}_D)$ para hacer DSM utilizando una única red neuronal, $s_\theta:\R^D\times\R_{++}\to\R^D$, que minimice la función de pérdida combinada
+    \begin{align*}
+\mathcal{L}_\text{DSM}(\theta)&=\sum_{k=1}^K \omega_k\,\mathbb{E}_{\epsilon\sim\mathcal{N}(0,I_D)}\left[\tfrac{1}{2}\left\|s_\theta(x+\sigma_k\epsilon,\sigma_k)+\tfrac{\epsilon}{\sigma_k}\right\|^2\right]\\
+&\propto \mathbb{E}_{k\sim\text{Uniforme}\{1,\ldots,K\},\,\epsilon\sim\mathcal{N}(0,I_D)}\left[\tfrac{\omega_k}{2}\left\|s_\theta(x+\sigma_k\epsilon,\sigma_k)+\tfrac{\epsilon}{\sigma_k}\right\|^2\right]
+\end{align*}
+    donde $(\omega_k)_{k=1}^K\subset\R_{++}$ son ponderadores asignados a cada nivel de ruido. Usualmente, se elige $\omega_k\propto\sigma_k^2$.
+\end{frame}
+
+\begin{frame}{Annealed Langevin sampling}
+    Para la generación de muestras desde el modelo anterior se puede generalizar el algoritmo de Langevin aplicándolo de forma secuencial de forma descendente en los niveles de ruido, utilizando la muestra generada en el nivel $k+1$ como inicialización para el nivel $k$. Esto se denomina \textbf{annealed Langevin sampling}:
+    \hspace{0.5cm}\vrule width 2pt\hspace{0.3cm}%
+    \begin{minipage}[t]{0.85\textwidth}
+        {\small
+            \begin{itemize}
+                \item[] \texttt{Inicializar} $x_{K+1}=0$
+                \item[] \texttt{Para} $k\in\{K,\ldots,1\}$:
+                \item[] \quad $\lambda_k = \lambda \left(\frac{\sigma_k}{\sigma_1}\right)^2$
+                \item[] \quad  $x_{\sigma_k}\!=\!\text{Langevin}(\text{score\_fn}\!=\!s_\theta(\cdot,\sigma_k),\text{init}\!=\!x_{\sigma_{k+1}},\text{step}\!=\!\lambda_k)$
+            \end{itemize}}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase:
+    \begin{itemize}
+        \item Introducción a los modelos de difusión.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 18: Score matching (parte II)}
+\end{frame}
+
+\end{document}
