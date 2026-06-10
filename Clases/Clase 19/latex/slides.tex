@@ -1,0 +1,175 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 19: Modelos de difusión (parte I)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2025}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Formulación de un DDPM}
+
+\begin{frame}{Idea general}
+    Un \textbf{modelo de difusión (DDPM)} es un modelo generativo formado por dos cadenas de Markov:
+    \begin{itemize}
+        \item \textbf{Proceso de difusión:} transforma datos reales en ruido gaussiano mediante la inyección progresiva de ruido.
+        \item \textbf{Proceso de denoising:} aprende a deshacer el proceso de difusión, transformando ruido gaussiano en datos reales.
+    \end{itemize}
+    \insertimage{dm_diagram}{0.8}
+\end{frame}
+
+\begin{frame}{Proceso forward}
+    Dada una secuencia decreciente $(\alpha_t)_{t=1}^T\subset(0,1)$, el proceso de difusión (\textbf{proceso forward}) está definido como:
+    \begin{equation*}
+        q(x_{0:T})=q(x_0)\prod_{t=1}^T q(x_t|x_{t-1}),
+    \end{equation*}
+    donde $q(x_0)=p_\text{data}(x_0)$ y $q(x_t|x_{t-1})\sim\mathcal{N}\left(\sqrt{\alpha_t}\,x_{t-1},(1-\alpha_t)\text{I}_D\right)$.
+    \begin{itemize}
+        \item  La secuencia $(\alpha_t)_{t=1}^T$ debe ser tal que $q(x_T)\approx p_{\text{prior}}(x_T)$, donde $p_{\text{prior}}(x_T)\sim\mathcal{N}(0,\text{I}_D)$.
+        \item En la práctica, es suficiente considerar $T\gg 1$ y $\alpha_T\in(0,1)$ lo suficientemente pequeño.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Proceso backward}
+    El proceso de denoising (\textbf{proceso backward}) está definido como:
+    \begin{equation*}
+        p_\theta(x_{0:T})=p(x_T)\prod_{t=1}^T p_\theta(x_{t-1}|x_t),
+    \end{equation*}
+    donde $p(x_T)=p_{\text{prior}}(x_T)$ y $p_\theta(x_{t-1}|x_t)\sim\mathcal{N}\left(\mu_\theta(x_t,t),\Sigma_\theta(x_t,t)\right)$.
+    \begin{itemize}
+        \item La media $\mu_\theta(x_t,t)\in\R^D$ y la matriz de covarianzas $\Sigma_\theta(x_t,t)\in\mathcal{M}_{D,D}(\R)$ son aprendidas por redes neuronales.
+        \item En la práctica, es usual fijar $\Sigma_\theta(x_t,t)$ a una cantidad conocida.
+        \item En consecuencia, un modelo de difusión solo debe entrenar una red neuronal $\mu_\theta:\R^D\times\{0,\ldots,T\}\to\R^D$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Propiedades del proceso forward}
+    Es necesario revisar dos propiedades del proceso forward, las cuales se utilizarán al definir la función objetivo (ELBO):
+    \begin{itemize}
+        \item $q(x_t|x_0)\sim\mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,(1-\bar\alpha_t)\operatorname{I}_D)$, donde
+              \begin{equation*}
+                  \bar\alpha_t=\prod\limits_{s=1}^t \alpha_s\in(0,1)
+              \end{equation*}
+        \item $q(x_{t-1}|x_t,x_0)\sim\mathcal{N}(\mu_q(x_0,x_t,t),\sigma_q^2(t)\operatorname{I}_D)$, donde
+              \begin{equation*}
+                  \begin{cases}
+                      \mu_q(x_0,x_t,t)=\frac{\sqrt{\bar\alpha_{t-1}}(1-\alpha_t)}{1-\bar\alpha_t}x_0 + \frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}x_t \\
+                      \sigma_q^2(t)=\frac{(1-\alpha_t)(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}
+                  \end{cases}
+              \end{equation*}
+    \end{itemize}
+\end{frame}
+
+\section{Entrenamiento de un DDPM}
+
+\begin{frame}{ELBO en un modelo de difusión}
+    Los modelos de difusión son modelos de variable latente, por lo que no se puede computar la verosimilitud de forma eficiente.
+    \begin{itemize}
+        \item \textbf{Variable observada:} $x_0\in\R^D$.
+        \item \textbf{Variables latentes:} $(x_1,\ldots,x_T)\subset\R^D$.
+    \end{itemize}
+    Para entrenar estos modelos, se puede extender el concepto de \textbf{ELBO} utilizado en VAEs:
+    \begin{equation*}
+        \operatorname{ELBO}(x_0) := \log p_\theta(x_0)-\operatorname{D_{KL}}\left(q(x_{1:T}|x_0)\| p_\theta(x_{1:T}|x_0)\right),
+    \end{equation*}
+    donde $x_{1:T} = (x_1,\ldots,x_T)$. Por otro lado, notar que, al igual que en un VAE, $\operatorname{ELBO}(x_0)\leq \log p_\theta(x_0)$ ya que $\operatorname{D_{KL}}(\cdots)\geq0$.
+\end{frame}
+
+\begin{frame}{Forma tratable para la ELBO}
+    La ELBO de un modelo de difusión admite la siguiente descomposición, donde todas las distribuciones son conocidas:
+    \begin{align*}
+        \operatorname{ELBO} & (x_0) =                                                                                                                        \\
+                            & \mathbb{E}_{q(x_1|x_0)}\left[\log p_\theta(x_0|x_1)\right]                                                                     \\
+                            & - \sum_{t=2}^T \mathbb{E}_{q(x_t|x_0)}\left[\operatorname{D_{KL}}\left(q(x_{t-1}|x_t,x_0)\|p_\theta(x_{t-1}|x_t)\right)\right] \\
+                            & +\text{constante}
+    \end{align*}
+    \vspace{-0.8cm}
+    \begin{itemize}
+        \item Todas las distribuciones presentes son gaussianas. En particular, las divergencias de Kullback-Leibler tienen forma cerrada.
+        \item Las esperanzas son estimadas usando Monte Carlo.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Forma tratable para la ELBO}
+    Para $\operatorname{D_{KL}}\left(q(x_{t-1}|x_t,x_0)\|p_\theta(x_{t-1}|x_t)\right)$, se tiene que:
+    \begin{itemize}
+        \item $q(x_{t-1}|x_t,x_0)\sim\mathcal{N}(\mu_q(x_0,x_t,t),\sigma_q^2(t)\operatorname{I}_D)$.
+        \item $p_\theta(x_{t-1}|x_t)\sim\mathcal{N}\left(\mu_\theta(x_t,t),\Sigma_\theta(x_t,t)\right)$.
+    \end{itemize}
+    Por lo tanto, resulta conveniente fijar $\Sigma_\theta(x_t,t)=\sigma_q^2(t)\operatorname{I}_D$. Luego:
+    \begin{equation*}
+        \operatorname{D_{KL}}\left(q(x_{t-1}|x_t,x_0)\|p_\theta(x_{t-1}|x_t)\right)
+        = \frac{1}{2\sigma_q^2(t)}\|\mu_q(x_0,x_t,t)-\mu_\theta(x_t,t)\|^2
+    \end{equation*}
+    Por otro lado, dado que $p_\theta(x_0|x_1)\sim\mathcal{N}(\mu_\theta(x_1,1),\sigma_q^2(1)\text{I}_D)$:
+    \begin{equation*}
+        \log p_\theta(x_0|x_1) = \frac{-1}{2\sigma_q^2(1)}\left\|\mu_q(x_0,x_1,1)-\mu_\theta(x_1,1)\right\|^2+\text{constante}
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Forma tratable para la ELBO}
+    En consecuencia, la ELBO de un modelo de difusión se reduce a una suma ponderada de errores cuadraticos:
+    \begin{equation*}
+        \operatorname{ELBO}(x_0) =
+        - \sum_{t=1}^T \frac{1}{2\sigma_q^2(t)}\mathbb{E}_{q(x_t|x_0)}\left[\|\mu_q(x_0,x_t,t)-\mu_\theta(x_t,t)\|^2\right]+\text{cte.}
+    \end{equation*}
+    \vspace{-0.5cm}
+    \begin{itemize}
+        \item Es usual omitir los ponderadores $\frac{1}{2\sigma_q^2(t)}$ para darle a todos los sumandos la misma importancia.
+        \item Además, en vez de calcular toda la suma, se suele entrenar el modelo muestreando un único $t\in\{1,\ldots,T\}$ por dato $x_0$.
+    \end{itemize}
+    Por lo tanto, un modelo de difusión es entrenado minimizando
+    \begin{equation*}
+        \mathbb{E}_{p_\text{data}(x_0),\,t\sim\text{Uniforme}(\{1,\ldots,T\}),\,q(x_t|x_0)}\left[\|\mu_q(x_0,x_t,t)-\mu_\theta(x_t,t)\|^2\right]
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Reparametrizaciones equivalentes.
+        \item Generación condicional y guidance.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 19: Modelos de difusión (parte I)}
+\end{frame}
+
+\end{document}
