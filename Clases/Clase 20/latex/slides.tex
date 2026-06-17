@@ -1,0 +1,227 @@
+\documentclass{beamer}
+\usepackage{ragged2e}
+\usepackage{amsmath,amssymb}
+
+\title{Modelos Generativos Profundos}
+\subtitle{Clase 20: Modelos de difusión (parte II)}
+\author{Fernando Fêtis Riquelme}
+\institute{
+    Facultad de Ciencias Físicas y Matemáticas\\
+    Universidad de Chile
+}
+\date{Otoño, 2026}
+\titlegraphic{\hfill\includegraphics[height=1.2cm]{images/fcfm}}
+
+\usetheme{metropolis}
+\setbeamercovered{transparent}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\pr}{\mathbb{P}}
+\newcommand{\argmax}{\operatorname{argmax}}
+\newcommand{\argmin}{\operatorname{argmin}}
+\newcommand{\insertimage}[2]{
+    \begin{center}
+        \includegraphics[width=#2\textwidth]{images/#1}
+    \end{center}
+}
+\setlength{\leftmargini}{0em}
+\renewcommand{\raggedright}{\leftskip=0pt \rightskip=0pt plus 0cm}
+
+\justifying
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Clase de hoy}
+    \tableofcontents
+\end{frame}
+
+\section{Repaso DDPM}
+
+\begin{frame}{Procesos forward y backward}
+    Un modelo de difusión define dos procesos:
+    \begin{itemize}
+        \item \textbf{Proceso forward:}
+              \begin{equation*}
+                  \hspace{-0.2cm}
+                  q(x_{0:T})=q(x_0)\prod_{t=1}^T q(x_t|x_{t-1}),
+                  \quad
+                  \begin{cases}
+                      q(x_0)=p_\text{data}(x_0) \\
+                      q(x_t|x_{t-1})\sim\mathcal{N}\left(\sqrt{\alpha_t}\,x_{t-1},(1-\alpha_t)\text{I}_D\right)
+                  \end{cases}
+              \end{equation*}
+              La secuencia $(\alpha_t)_{t=1}^T\subset(0,1)$ se elige tal que $q(x_T)\approx p_{\text{prior}}(x_T)$.
+        \item \textbf{Proceso backward:}
+              \begin{equation*}
+                  \hspace{-0.2cm}
+                  p_\theta(x_{0:T})=p(x_T)\prod_{t=1}^T p_\theta(x_{t-1}|x_t),
+                  \quad
+                  \begin{cases}
+                      p(x_T)=p_{\text{prior}}(x_T) \\
+                      p_\theta(x_{t-1}|x_t)\sim\mathcal{N}\left(\mu_\theta(x_t,t),\Sigma_\theta(x_t,t)\right)
+                  \end{cases}
+              \end{equation*}
+              Se suele fijar $\Sigma_\theta(x_t,t)$ a un valor conveniente, por lo que solo se debe entrenar la red neuronal $\mu_\theta:\R^D\times\{0,\ldots,T\}\to\R^D$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    DDPM se entrena maximizando $\mathbb{E}_{p_\text{data}(x_0)}\left[\operatorname{ELBO}(x_0)\right]$, donde
+    \begin{equation*}
+        \operatorname{ELBO}(x_0) := \log p_\theta(x_0)-\operatorname{D_{KL}}\left(q(x_{1:T}|x_0)\| p_\theta(x_{1:T}|x_0)\right)
+    \end{equation*}
+    Esta cantidad puede descomponerse como:
+    \begin{equation*}
+        \hspace{-0.5cm}
+        \mathbb{E}_{q(x_1|x_0)}\left[\log p_\theta(x_0|x_1)\right]- \sum_{t=2}^T \mathbb{E}_{q(x_t|x_0)}\left[\operatorname{D_{KL}}\left(q(x_{t-1}|x_t,x_0)\|p_\theta(x_{t-1}|x_t)\right)\right]+\text{cte.}
+    \end{equation*}
+    Todas las distribuciones involucradas son conocidas:
+    \begin{itemize}
+        \item $q(x_t|x_0)\sim\mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,(1-\bar\alpha_t)\operatorname{I}_D)$, donde $\bar\alpha_t=\prod\limits_{s=1}^t \alpha_s\in(0,1)$.
+        \item $q(x_{t-1}|x_t,x_0)\sim\mathcal{N}(\mu_q(x_0,x_t,t),\sigma_q^2(t)\operatorname{I}_D)$, con $\mu_q$ y $\sigma_q^2$ conocidos.
+        \item $p_\theta(x_{t-1}|x_t)\sim\mathcal{N}\left(\mu_\theta(x_t,t),\Sigma_\theta(x_t,t)\right)$, con $\Sigma_\theta(x_t,t)=\sigma_q^2(t)\operatorname{I}_D$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Entrenamiento}
+    Desarrollando los términos anteriores, la ELBO se reduce a:
+    \begin{equation*}
+        \operatorname{ELBO}(x_0) =
+        - \sum_{t=1}^T \frac{1}{2\sigma_q^2(t)}\mathbb{E}_{q(x_t|x_0)}\left[\|\mu_q(x_0,x_t,t)-\mu_\theta(x_t,t)\|^2\right]+\text{cte.}
+    \end{equation*}
+    En la práctica, se minimiza una función de pérdida simplificada:
+    \begin{equation*}
+        \mathbb{E}_{p_\text{data}(x_0),\,t\sim\text{Uniforme}(\{1,\ldots,T\}),\,q(x_t|x_0)}\left[\|\mu_q(x_0,x_t,t)-\mu_\theta(x_t,t)\|^2\right]
+    \end{equation*}
+    Con el modelo entrenado, se pueden generar nuevas muestras mediante \textbf{ancestral sampling}, comenzando desde $x_T\sim p_{\text{prior}}(x_T)$ y muestreando sucesivamente $x_{t-1}\sim p_\theta(x_{t-1}|x_t)$ para $t\in\{T,\ldots,1\}$.
+\end{frame}
+
+\section{Reparametrizaciones equivalentes}
+
+\begin{frame}{Motivación}
+    Es usual \textbf{reparametrizar} la red neuronal $\mu_\theta(x_t,t)$ para que, en vez de aprender $\mu_q(x_0,x_t,t)$, aprenda otra cantidad relacionada.
+
+    Veremos tres reparametrizaciones usuales:
+    \begin{itemize}
+        \item \textbf{$x_0$-prediction:} aprender a predecir la muestra original $x_0$.
+        \item \textbf{$\epsilon$-prediction:} aprender a predecir el ruido $\epsilon_t$ inyectado a $x_0$ para obtener $x_t$.
+        \item \textbf{Score-prediction:} aprender a predecir el score $\nabla_{x_t}\log q(x_t)$.
+    \end{itemize}
+    En todos los casos la idea es reescribir $\mu_q(x_0,x_t,t)$ para que la red neuronal aprenda solo los términos desconocidos.
+\end{frame}
+
+\begin{frame}{$x_0$-prediction}
+    Dado que $\mu_q(x_0,x_t,t)=c_1(t)x_0+c_2(t)x_t$, entonces
+    \begin{equation*}
+        \tilde x_0=\frac{1}{c_1(t)}\mu_\theta(x_t,t)-\frac{c_2(t)}{c_1(t)}x_t
+    \end{equation*}
+    puede verse como una estimación de la muestra $x_0\sim p_\text{data}(x_0)$ a la que se le inyectó el ruido.
+
+    Más aún, se puede reparametrizar la red neuronal $\mu_\theta(x_t,t)$ como $\mu_\theta(x_t,t)=c_1(t)x_\theta(x_t,t)+c_2(t)x_t$, donde $x_\theta(x_t,t)$ se entrena para aprender directamente $x_0$ en lugar de $\mu_q$. En este caso:
+    \begin{equation*}
+        \operatorname{ELBO}(x_0) =
+        \sum_{t=1}^T \frac{c_1^2(t)}{2\sigma_q^2(t)}\mathbb{E}_{q(x_t|x_0)}\left[\|x_0-x_\theta(x_t,t)\|^2\right]+\text{cte.}
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{$\epsilon$-prediction}
+    Otra reparametrización posible es predecir directamente el ruido $\epsilon_t$ inyectado a la muestra $x_0$ para obtener $x_t$.
+
+    Dado que $x_t=\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\epsilon_t$, entonces
+    \begin{equation*}
+        x_0=\frac{1}{\sqrt{\bar\alpha_t}}x_t-\frac{\sqrt{1-\bar\alpha_t}}{\sqrt{\bar\alpha_t}}\epsilon(x_0,x_t,t)
+    \end{equation*}
+    De este modo, sustituyendo en $\mu_q(x_0,x_t,t)=c_1(t)x_0+c_2(t)x_t$:
+    \begin{equation*}
+        \mu_q(x_0,x_t,t)=\left(\frac{c_1(t)}{\sqrt{\bar\alpha_t}}+c_2(t)\right)x_t- \frac{c_1(t)\sqrt{1-\bar\alpha_t}}{\sqrt{\bar\alpha_t}}\epsilon(x_0,x_t,t)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{$\epsilon$-prediction}
+    La igualdad anterior permite reparametrizar $\mu_\theta(x_t,t)$ como
+    \begin{equation*}
+        \mu_\theta(x_t,t)=\left(\frac{c_1(t)}{\sqrt{\bar\alpha_t}}+c_2(t)\right)x_t- \frac{c_1(t)\sqrt{1-\bar\alpha_t}}{\sqrt{\bar\alpha_t}}\epsilon_\theta(x_t,t),
+    \end{equation*}
+    donde $\epsilon_\theta(x_t,t)$ se entrena para predecir el ruido inyectado a $x_0$ para obtener $x_t$. En este caso:
+    \begin{equation*}
+        \hspace{-0.2cm}
+        \operatorname{ELBO}(x_0) = - \sum_{t=1}^T \frac{c_1^2(t)(1-\bar\alpha_t)}{2\sigma_q^2(t)\bar\alpha_t}\mathbb{E}_{q(x_t|x_0)}\left[\|\epsilon(x_0,x_t,t)-\epsilon_\theta(x_t,t)\|^2\right]+\text{cte.}
+    \end{equation*}
+    Esta reparametrización es la más utilizada en la práctica ya que un ruido gaussiano es más fácil de aprender que una imagen $x_0$ o una media $\mu_q$. Notar que también permite estimar $x_0$.
+\end{frame}
+
+\begin{frame}{Score-prediction}
+    Una de las reparametrizaciones más importantes consiste en aprender el \textbf{score} $\nabla_{x_t}\log q(x_t)$ en vez de $\mu_q$, $x_0$ o $\epsilon_t$. Esto permite:
+    \begin{itemize}
+        \item Conectar los DMs con los modelos basados en score.
+        \item Utilizar la técnica de \textbf{guidance} para generación condicional.
+        \item Formular modelos de difusión a tiempo continuo usando SDEs.
+    \end{itemize}
+    Para esto, es necesario utilizar una propiedad de las distribuciones gaussianas conocida como \textbf{fórmula de Tweedie}.
+\end{frame}
+
+\begin{frame}{Score-prediction}
+    Si $p(y|x)\sim\mathcal{N}(x,\sigma^2\text{I}_D)$ es una distribución gaussiana con media $x\sim p(x)$ desconocida. Entonces, para una muestra $y\sim p(y|x)$:
+    \begin{equation*}
+        \mathbb{E}_{p(x|y)}[x]=y+\sigma^2\nabla_y \log p(y)
+    \end{equation*}
+    La expresión del lado derecho puede verse como una corrección del estimador de máxima verosimilitud de la media de $p(y|x)$, el cual es simplemente la muestra observada $y$.
+
+    Bajo esta interpretación, el término $\sigma^2\nabla_y \log p(y)$ empuja la estimación hacia el centro, dependiendo del valor de $\nabla_y \log p(y)$.
+\end{frame}
+
+\begin{frame}{Score-prediction}
+    Dado que $q(x_t|x_0)\sim\mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,(1-\bar\alpha_t)\operatorname{I}_D)$, la fórmula de Tweedie indica que
+    \begin{equation*}
+        \sqrt{\bar\alpha_t} \,\underbrace{\mathbb{E}_{q(x_0|x_t)}[x_0]}_{x_0}=x_t+(1-\bar\alpha_t)\nabla_{x_t}\log q(x_t)
+    \end{equation*}
+    Por lo tanto, $x_0 = \frac{1}{\sqrt{\bar\alpha_t}}x_t+\frac{1-\bar\alpha_t}{\sqrt{\bar\alpha_t}}\nabla_{x_t}\log q(x_t)$.
+
+    Esto puede sustituirse en $\mu_q(x_0,x_t,t)=c_1(t)x_0+c_2(t)x_t$:
+    \begin{equation*}
+        \mu_q(x_0,x_t,t) = \left(\frac{c_1(t)}{\sqrt{\bar\alpha_t}}+c_2(t)\right)x_t+ \frac{c_1(t)(1-\bar\alpha_t)}{\sqrt{\bar\alpha_t}}\nabla_{x_t}\log q(x_t)
+    \end{equation*}
+\end{frame}
+
+\begin{frame}{Score-prediction}
+    La igualdad anterior permite reparametrizar $\mu_\theta(x_t,t)$ como
+    \begin{equation*}
+        \mu_\theta(x_t,t)=\left(\frac{c_1(t)}{\sqrt{\bar\alpha_t}}+c_2(t)\right)x_t+ \frac{c_1(t)(1-\bar\alpha_t)}{\sqrt{\bar\alpha_t}}s_\theta(x_t,t)
+    \end{equation*}
+    donde la red neuronal $s_\theta(x_t,t)$ se entrena para predecir el score $\nabla_{x_t}\log q(x_t)$. En este caso:
+    \begin{equation*}
+        \hspace{-0.7cm}
+        \operatorname{ELBO}(x_0) = - \sum_{t=1}^T \frac{c_1^2(t)(1-\bar\alpha_t)^2}{2\sigma_q^2(t)\bar\alpha_t}\mathbb{E}_{q(x_t|x_0)}\left[\|\nabla_{x_t}\log q(x_t)-s_\theta(x_t,t)\|^2\right]+\text{cte.}
+    \end{equation*}
+    En particular, los DMs pueden verse como un caso particular de \textbf{denoising score-matching} con varios niveles de ruido.
+\end{frame}
+
+\begin{frame}{Conclusiones}
+    \begin{itemize}
+        \item En todos los casos, la ELBO sigue siendo una suma ponderada de errores cuadráticos medios entre la cantidad verdadera y la estimada por la red neuronal.
+        \item Igual que en la formulación original ($\mu_q$-prediction), los ponderadores de la ELBO suelen ser ignorados en la práctica.
+        \item Todas las reparametrizaciones son equivalentes entre sí. En particular, cualquiera de las reparametrizaciones permite estimar la media $\mu_q$, la imagen original $x_0$, el ruido $\epsilon_t$ y el score $\nabla_{x_t}\log q(x_t)$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Próxima clase}
+    En la próxima clase.
+    \begin{itemize}
+        \item Generación condicional y guidance.
+        \item Arquitecturas neuronales para DMs.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Large{Modelos Generativos Profundos}\\
+    \large{Clase 20: Modelos de difusión (parte II)}
+\end{frame}
+
+\end{document}
