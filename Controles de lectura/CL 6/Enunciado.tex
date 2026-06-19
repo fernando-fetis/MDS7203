@@ -1,0 +1,55 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº6}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Responda las siguientes preguntas de forma breve y precisa. El control de lectura tiene una duración de 20 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\section*{Score matching}
+\begin{enumerate}[{\bf P1.}]
+	\item La divergencia de Fisher es la cantidad natural para entrenar un modelo de score $s_\theta:\R^D\to\R^D$ que aproxime el score de la distribución de datos, $\nabla_x\log p_{\text{data}}(x)$:
+	\begin{equation*}
+		\operatorname{D_F}\left(p_{\text{data}}(x)\|p_\theta(x)\right)
+		:= \mathbb{E}_{p_{\text{data}}(x)}\!\left[\frac{1}{2}\left\|s_\theta(x)-\nabla_x\log p_{\text{data}}(x)\right\|^2\right]
+	\end{equation*}
+	Explique cómo se utiliza $s_\theta$ para generar muestras desde $p_\theta\approx p_{\text{data}}$. Además, explique dos metodologías para optimizar la cantidad intratable $\operatorname{D_F}\left(p_{\text{data}}(x)\|p_\theta(x)\right)$.
+
+	\item Una limitación del sampling de Langevin es que puede quedar atrapado en modas locales de la distribución, especialmente cuando el score es débil en regiones de baja densidad. Explique cómo el uso de múltiples niveles de ruido en denoising score matching ayuda a mitigar este problema.
+\end{enumerate}
+
+\section*{Modelos de difusión}
+\begin{enumerate}[{\bf P1.}]
+	\item Explique la relación entre los modelos de difusión y los autoencoders variacionales. En particular, explique cómo esto influye en la función objetivo que se optimiza para entrenar un modelo de difusión.
+
+	\item Explique la relación entre los modelos de difusión y la técnica de score matching con múltiples niveles de ruido.
+\end{enumerate}
+
+\end{document}
