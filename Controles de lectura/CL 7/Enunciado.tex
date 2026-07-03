@@ -1,0 +1,136 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{geometry}
+\usepackage{enumerate}
+
+%Comandos:
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+% Configuración de página:
+\geometry{letterpaper,margin=2cm,tmargin=3cm}
+
+\fancypagestyle{plain}{
+	\fancyhead[L]{Universidad de Chile\\Facultad de Ciencias Físicas y Matemáticas\\MDS7203 Modelos Generativos Profundos}
+	\fancyhead[R]{\includegraphics[height=1.5cm]{images/fcfm}}
+}
+\pagestyle{fancy}{
+\fancyhead[L]{Facultad de Ciencias Físicas y Matemáticas}
+\fancyhead[R]{Universidad de Chile}
+}
+
+%Título:
+\title{\bfseries{Control de Lectura nº7}\vspace{0.5cm}}
+\author{\textbf{Nombre:} \rule{12cm}{0.4pt}}
+
+% Documento:
+\begin{document}
+\maketitle
+
+\hspace{-0.5cm}\textbf{Instrucciones:} Marque la \textbf{única} alternativa correcta en cada pregunta. El control de lectura tiene una duración de 25 minutos y no está permitido el uso de apuntes ni dispositivos electrónicos.
+
+\begin{enumerate}[{\bf 1.}]
+
+	\item La técnica de \textbf{classifier guidance} para generación condicional se basa en:
+	      \begin{enumerate}[(a)]
+		      \item Utilizar únicamente el score incondicional $\nabla_{x_t}\log q(x_t)$.
+		      \item Entrenar un modelo de difusión distinto, desde cero, para cada clase.
+		      \item Sumar al score incondicional el gradiente de un clasificador $\nabla_{x_t}\log q(y|x_t)$.
+		      \item Minimizar la distancia euclidiana a una imagen de referencia.
+	      \end{enumerate}
+
+	\item A diferencia de classifier guidance, la técnica de \textbf{classifier-free guidance}:
+	      \begin{enumerate}[(a)]
+		      \item Requiere entrenar un clasificador robusto al ruido por separado.
+		      \item Usa un único modelo condicional que también aprende el caso incondicional, reemplazando la condición por un token nulo ($\varnothing$) durante el entrenamiento.
+		      \item No permite regular la fuerza con que se aplica la condición.
+		      \item Solo sirve para condiciones de tipo imagen.
+	      \end{enumerate}
+
+	\item Al aumentar el \textbf{guidance scale} en classifier-free guidance, típicamente:
+	      \begin{enumerate}[(a)]
+		      \item No se produce ningún efecto sobre las muestras.
+		      \item Aumenta la diversidad de las muestras y disminuye la fidelidad a la condición.
+		      \item El modelo deja de depender del prompt.
+		      \item Aumenta la fidelidad/alineación con la condición, usualmente a costa de una menor diversidad.
+	      \end{enumerate}
+
+	\item Para condicionar la generación con \textbf{texto}, es habitual obtener los embeddings de la descripción mediante:
+	      \begin{enumerate}[(a)]
+		      \item Un modelo preentrenado como CLIP o un encoder de texto tipo BERT/T5.
+		      \item Un histograma de colores de la imagen generada.
+		      \item El propio autoencoder (VAE) del modelo.
+		      \item Un clasificador de dígitos.
+	      \end{enumerate}
+
+	\item Las \textbf{modulaciones tipo FiLM} en la U-Net se utilizan típicamente para inyectar:
+	      \begin{enumerate}[(a)]
+		      \item Una secuencia de tokens de texto, uno por cada palabra.
+		      \item El ruido gaussiano inicial.
+		      \item El embedding del tiempo $t$ (y un embedding global de la condición), escalando y desplazando las activaciones de los bloques.
+		      \item Los pesos de una LoRA.
+	      \end{enumerate}
+
+	\item La \textbf{atención cruzada} (\textit{cross-attention}) en la U-Net se usa principalmente para:
+	      \begin{enumerate}[(a)]
+		      \item Inyectar una secuencia de embeddings (por ejemplo, de texto) como condición.
+		      \item Reducir la resolución espacial de la imagen.
+		      \item Reemplazar la función de pérdida del modelo.
+		      \item Eliminar todo el ruido en un solo paso.
+	      \end{enumerate}
+
+	\item El \textbf{Diffusion Transformer (DiT)} se caracteriza por:
+	      \begin{enumerate}[(a)]
+		      \item Eliminar por completo el proceso de denoising.
+		      \item Reemplazar la arquitectura U-Net por una basada en Transformers (operando sobre parches latentes).
+		      \item Entrenarse sin ninguna función de pérdida.
+		      \item Operar únicamente en el espacio de píxeles de alta resolución.
+	      \end{enumerate}
+
+	\item \textbf{Stable Diffusion} es un modelo de difusión \textit{latente}, lo que significa que:
+	      \begin{enumerate}[(a)]
+		      \item No utiliza ninguna red neuronal.
+		      \item Agrega ruido únicamente a la mitad de la imagen.
+		      \item Genera imágenes sin ningún tipo de condición.
+		      \item El proceso de difusión ocurre en el espacio latente de un autoencoder (VAE), no directamente en píxeles.
+	      \end{enumerate}
+
+	\item En general, un \textbf{adaptador} (como LoRA o ControlNet) se caracteriza por:
+	      \begin{enumerate}[(a)]
+		      \item Reentrenar todos los parámetros del modelo base desde cero.
+		      \item Agregar y entrenar un conjunto reducido de parámetros nuevos, manteniendo (en general) congelados los parámetros originales del modelo.
+		      \item Eliminar parámetros del modelo para hacerlo más pequeño.
+		      \item Existir solo durante el entrenamiento y no poder usarse en inferencia.
+	      \end{enumerate}
+
+	\item \textbf{LoRA} reduce el costo del fine-tuning porque:
+	      \begin{enumerate}[(a)]
+		      \item Aprende actualizaciones de bajo rango ($\Delta W = BA$) sobre las capas lineales, entrenando muchos menos parámetros que $W$.
+		      \item Utiliza imágenes de menor resolución.
+		      \item Elimina las capas de atención del modelo.
+		      \item Entrena únicamente la última capa del modelo.
+	      \end{enumerate}
+
+	\item \textbf{ControlNet} permite condicionar la generación con una imagen (boceto, mapa de profundidad, etc.). Para ello:
+	      \begin{enumerate}[(a)]
+		      \item Reentrena la U-Net completa con la nueva condición.
+		      \item Reemplaza el VAE por un clasificador de imágenes.
+		      \item Clona ciertos bloques del encoder (y el bloque intermedio) de la U-Net, los conecta mediante convoluciones inicializadas en cero (\textit{zero-convolutions}) y mantiene congelado el modelo original.
+		      \item Convierte el modelo de difusión en un clasificador de imágenes.
+	      \end{enumerate}
+
+	\item Respecto a \textbf{Textual Inversion} y \textbf{DreamBooth} para aprender un concepto nuevo a partir de pocas imágenes:
+	      \begin{enumerate}[(a)]
+		      \item Ambos reentrenan por completo el text-encoder.
+		      \item Textual Inversion aprende únicamente un nuevo embedding (token) dejando el resto del modelo congelado, mientras que DreamBooth hace fine-tuning del modelo asociando el concepto a un identificador.
+		      \item Textual Inversion modifica todos los pesos del modelo y DreamBooth solo aprende un embedding.
+		      \item Ninguno de los dos permite luego usar el concepto en prompts.
+	      \end{enumerate}
+
+\end{enumerate}
+
+\end{document}
